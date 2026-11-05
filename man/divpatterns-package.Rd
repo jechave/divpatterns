@@ -4,9 +4,9 @@
 \name{divpatterns-package}
 \alias{divpatterns}
 \alias{divpatterns-package}
-\title{divpatterns: Observed Patterns of Protein Evolutionary Divergence}
+\title{divpatterns: Patterns of Protein Evolutionary Divergence}
 \description{
-Calculates observed patterns of divergence for real homologous proteins, given their structures and a sequence alignment. These are the patterns to which simulated evolution models are fitted and compared.
+Functions to calculate and analyse patterns of protein evolutionary divergence at the sequence, structure and motion levels, from homologous proteins, given their structures and a sequence alignment.
 }
 \author{
 \strong{Maintainer}: Julian Echave \email{jechave@unsam.edu.ar} (\href{https://orcid.org/0000-0003-0678-5593}{ORCID})
