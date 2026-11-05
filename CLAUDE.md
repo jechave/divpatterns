@@ -7,26 +7,16 @@ proteins, given their structures and a sequence alignment. These are the observe
 patterns to which simulated evolution models are fitted and compared. Simulating
 evolution is outside this package.
 
-## Plan
+## Scope
 
-Purpose: calculate observed divergence patterns from real homologous proteins,
-for fitting and comparing simulated evolution models.
+ENMs are built with penm. Comparing proteins is done here, because alignments,
+indels and averaging over pairs have no counterpart in penm.
 
-Principle: ENMs are built with penm. Comparing proteins is done here, because
-alignments, indels and averaging over pairs have no counterpart in penm.
-Integrating the two packages can be reconsidered later.
+Topics, in rough order:
 
-1. Site metrics, two proteins: structure and motion comparisons that use no
-   normal modes.
-2. Site metrics, family: explore how to combine proteins with different indels,
-   then settle it. This includes site `lrmsd` and `nlrmsd`.
-3. Mode metrics: explore how to compare two proteins, then a family. One idea
-   to test is using the eigenvectors of the conserved covariance block.
-   This includes mode `lrmsd` and `nlrmsd`.
-4. Sequence metrics: a future version.
-
-Each exploration step ends with a decision, recorded here, before its
-functions become part of the package.
+- site metrics
+- mode metrics
+- sequence metrics, in a future version
 
 ## What to calculate
 
