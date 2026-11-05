@@ -1,0 +1,17 @@
+Package: divpatterns
+Title: Observed Patterns of Protein Evolutionary Divergence
+Version: 0.1.0
+Authors@R: 
+    person("Julian", "Echave", , "jechave@unsam.edu.ar", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-0678-5593"))
+Description: Calculates observed patterns of divergence for real
+    homologous proteins, given their structures and a sequence alignment.
+    These are the patterns to which simulated evolution models are fitted
+    and compared.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
