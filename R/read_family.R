@@ -1,0 +1,136 @@
+#' Read a family of homologous structures
+#'
+#' Reads a sequence alignment and one structure file per aligned sequence, and
+#' places every residue of every structure in its alignment column.
+#'
+#' Each sequence of the alignment, without its gaps, must be the sequence of
+#' the residues in its file, in the order of the file. The first residue of
+#' the file goes to the column of the first letter of its sequence, the second
+#' residue to the column of the second letter, and so on. A residue is an
+#' amino acid with a Calpha atom; other records, such as water or ligands, are
+#' ignored. Where a file gives alternate locations for an atom, the first is
+#' used.
+#'
+#' @param alignment Path to a FASTA alignment.
+#' @param files Paths to the structure files, in PDB format: one per sequence,
+#'   in the order of the alignment. Each file must hold one chain.
+#'
+#' @return A list of class `divpatterns_family`. Its matrices have one row
+#'   per structure and one column per alignment column:
+#'   - `id`: the sequence identifiers of the alignment.
+#'   - `file`: the structure files.
+#'   - `alignment`: the aligned sequences, one letter per residue, `"-"` at
+#'     gaps.
+#'   - `resno`, `insert`, `resname`: residue number, insertion code and
+#'     residue name, as in the files; `NA` at gaps, and `insert` is `NA` where
+#'     a residue has no insertion code.
+#'   - `ca`, `n`, `c`, `o`: coordinates of the Calpha, N, C and O atoms,
+#'     arrays indexed by structure, coordinate (x, y, z) and column; `NA` at
+#'     gaps and where a file lacks the atom.
+#'
+#' @seealso [fit_to_reference()], [view_family()]
+#' @export
+#' @examples
+#' \dontrun{
+#' family <- read_family("family.fasta", c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb"))
+#' }
+read_family <- function(alignment, files) {
+  aln <- bio3d::read.fasta(alignment)
+  ids <- aln$id
+  letters <- toupper(unname(aln$ali))
+  n_structures <- length(ids)
+  n_columns <- ncol(letters)
+
+  if (!is.character(files) || length(files) != n_structures) {
+    stop(sprintf("The alignment has %d sequences, so `files` must be %d file paths.", n_structures, n_structures), call. = FALSE)
+  }
+  missing <- files[!file.exists(files)]
+  if (length(missing) > 0) {
+    stop("Files not found: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+
+  resno <- matrix(NA_integer_, n_structures, n_columns)
+  insert <- matrix(NA_character_, n_structures, n_columns)
+  resname <- matrix(NA_character_, n_structures, n_columns)
+  # coordinates: structure, x/y/z, column
+  ca_xyz <- array(NA_real_, c(n_structures, 3, n_columns))
+  n_xyz <- ca_xyz
+  c_xyz <- ca_xyz
+  o_xyz <- ca_xyz
+
+  for (k in seq_len(n_structures)) {
+    residues <- read_residues(files[k])
+    columns <- which(letters[k, ] != "-")
+    if (!identical(residues$letter, letters[k, columns])) {
+      stop(sprintf(
+        "%s: its residues do not match sequence %s of the alignment. File: %s. Alignment: %s.",
+        files[k], ids[k], paste(residues$letter, collapse = ""), paste(letters[k, columns], collapse = "")
+      ), call. = FALSE)
+    }
+    resno[k, columns] <- residues$resno
+    insert[k, columns] <- residues$insert
+    resname[k, columns] <- residues$resname
+    ca_xyz[k, , columns] <- residues$ca
+    n_xyz[k, , columns] <- residues$n
+    c_xyz[k, , columns] <- residues$c
+    o_xyz[k, , columns] <- residues$o
+  }
+
+  structure(
+    list(
+      id = ids, file = files, alignment = letters, resno = resno, insert = insert, resname = resname,
+      ca = ca_xyz, n = n_xyz, c = c_xyz, o = o_xyz
+    ),
+    class = "divpatterns_family"
+  )
+}
+
+#' @export
+print.divpatterns_family <- function(x, ...) {
+  cat(sprintf("<divpatterns_family> %d structures, %d alignment columns\n", length(x$id), ncol(x$alignment)))
+  invisible(x)
+}
+
+# The residues of a PDB file, in the order of the file: the amino acids with a Calpha atom. Returns their
+# numbers, insertion codes, names and one-letter codes, and the coordinates of their Calpha, N, C and O
+# atoms as matrices with one column per residue (NA where the file lacks an atom).
+read_residues <- function(file) {
+  # read.pdb() prints a note where a file has alternate locations (it keeps the first); not shown here
+  utils::capture.output(pdb <- bio3d::read.pdb(file, verbose = FALSE))
+  atoms <- pdb$atom
+  ca_rows <- bio3d::atom.select(pdb, "calpha", verbose = FALSE)$atom
+  if (length(ca_rows) == 0) {
+    stop(sprintf("%s: no Calpha atoms.", file), call. = FALSE)
+  }
+  if (length(unique(atoms$chain[ca_rows])) > 1) {
+    stop(sprintf("%s: the file must hold one chain.", file), call. = FALSE)
+  }
+
+  # an atom belongs to the residue with the same chain, number, insertion code and name
+  residue_of_atom <- paste(atoms$chain, atoms$resno, atoms$insert, atoms$resid)
+  residues <- residue_of_atom[ca_rows]
+  if (anyDuplicated(residues)) {
+    stop(sprintf("%s: a residue has more than one Calpha atom.", file), call. = FALSE)
+  }
+
+  coordinates <- list()
+  for (atom_name in c("CA", "N", "C", "O")) {
+    rows <- which(atoms$elety == atom_name & residue_of_atom %in% residues)
+    if (anyDuplicated(residue_of_atom[rows])) {
+      stop(sprintf("%s: a residue has more than one %s atom.", file, atom_name), call. = FALSE)
+    }
+    row_of_residue <- rows[match(residues, residue_of_atom[rows])]
+    coordinates[[atom_name]] <- t(as.matrix(atoms[row_of_residue, c("x", "y", "z")]))
+  }
+
+  list(
+    resno = atoms$resno[ca_rows],
+    insert = atoms$insert[ca_rows],
+    resname = atoms$resid[ca_rows],
+    letter = unname(bio3d::aa321(atoms$resid[ca_rows])),
+    ca = unname(coordinates$CA),
+    n = unname(coordinates$N),
+    c = unname(coordinates$C),
+    o = unname(coordinates$O)
+  )
+}

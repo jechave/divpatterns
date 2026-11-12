@@ -1,0 +1,10 @@
+divpatterns bundles one third-party library, in inst/viewer/3Dmol-min.js:
+
+3Dmol.js 2.4.2 (https://3dmol.org), the minified build distributed on npm
+(package 3dmol) and on cdnjs. Author: David Koes and contributors.
+Copyright (c) 2014, University of Pittsburgh and contributors.
+Licensed under the BSD-3-Clause license. 3Dmol.js incorporates code from
+GLmol (MIT or LGPL3), three.js (MIT) and jQuery (MIT).
+
+The full licence text, as distributed with 3Dmol.js 2.4.2, is in
+inst/viewer/3Dmol-LICENSE.

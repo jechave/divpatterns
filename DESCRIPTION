@@ -1,16 +1,29 @@
 Package: divpatterns
 Title: Patterns of Protein Evolutionary Divergence
 Version: 0.1.0
-Authors@R: 
+Authors@R: c(
     person("Julian", "Echave", , "jechave@unsam.edu.ar", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0003-0678-5593"))
+           comment = c(ORCID = "0000-0003-0678-5593")),
+    person("University of Pittsburgh and contributors", role = "cph",
+           comment = "3Dmol.js library, bundled in inst/viewer; see inst/COPYRIGHTS")
+  )
 Description: Functions to calculate and analyse patterns of protein
     evolutionary divergence at the sequence, structure and motion levels,
     from homologous proteins, given their structures and a sequence alignment.
 License: MIT + file LICENSE
+URL: https://github.com/jechave/divpatterns
+BugReports: https://github.com/jechave/divpatterns/issues
+Depends: 
+    R (>= 4.1.0)
+Imports: 
+    bio3d,
+    jsonlite,
+    stats,
+    utils
+Suggests: 
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 8.0.0
-Suggests: 
-    testthat (>= 3.0.0)
-Config/testthat/edition: 3

@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<!-- Written by divpatterns::view_family(). Includes 3Dmol.js (BSD-3-Clause, University of Pittsburgh and contributors). -->
+<style>
+/* Layout: a row of controls, then the matrix and the alignment (left) next to the 3D view (right); stacked on phones. */
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --ink: #2b2b28;
+  --soft: #6b6a63;
+  --line: #dddcd5;
+  --gap: #d9d9d4;
+  --noref: #8f8d86;
+  --refrow: #efe6cc;
+  --stage: #d3d1ca;
+  --refchain: #39ff14;
+  --refink: #0b0b0a;
+  --mark: #c51b8a;
+  --hoverrow: rgba(197, 27, 138, 0.10);
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1a; --surface: #252523; --ink: #e6e5df; --soft: #a3a29a; --line: #3a3935;
+    --gap: #45443f; --noref: #85837b; --refrow: #5a5340; --stage: #33322e; --refchain: #39ff14; --mark: #f05fb6;
+    --hoverrow: rgba(240, 95, 182, 0.16); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1c1a; --surface: #252523; --ink: #e6e5df; --soft: #a3a29a; --line: #3a3935;
+  --gap: #45443f; --noref: #85837b; --refrow: #5a5340; --stage: #33322e; --refchain: #39ff14; --mark: #f05fb6;
+  --hoverrow: rgba(240, 95, 182, 0.16); color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+.page {
+  max-width: 1320px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+  display: grid; gap: 14px;
+}
+header { display: grid; gap: 4px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.sub { color: var(--soft); margin: 0; max-width: 95ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.group { display: flex; align-items: center; gap: 8px; }
+.group-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--soft); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--sans); padding: 5px 11px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 13px var(--sans); padding: 5px 11px; border-radius: 6px; cursor: pointer; }
+.btn:hover, .seg button:hover:not([aria-pressed="true"]) { background: var(--bg); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 480px); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.leftcol { display: grid; gap: 18px; min-width: 0; }
+.panel { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; }
+.panel h2 { font-size: 13px; font-weight: 600; margin: 0; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.panel h2 span { font-weight: 400; color: var(--soft); }
+.matrix-box { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); }
+.scroller { overflow-x: auto; overflow-y: hidden; }
+.cells-wrap { position: relative; }
+#labels, #cells { display: block; }
+#labels, #overlay { cursor: pointer; touch-action: manipulation; }
+#overlay { position: absolute; left: 0; top: 0; }
+.viewer-col { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); }
+#stage { position: relative; width: 100%; aspect-ratio: 1 / 1; max-width: 100%; border-radius: 6px; overflow: hidden; background: var(--stage); }
+.legend { display: grid; gap: 4px; font-size: 11.5px; color: var(--soft); }
+.ramp { height: 10px; border-radius: 2px; }
+.ticks { position: relative; height: 14px; font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.swatches span { display: inline-flex; align-items: center; gap: 5px; }
+.swatches i { width: 12px; height: 10px; border-radius: 2px; display: inline-block; border: 1px solid var(--line); }
+.key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--soft); }
+.key span { display: inline-flex; align-items: center; gap: 5px; }
+.key i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.key i.refsw { height: 6px; box-shadow: 0 0 0 1px var(--soft); }
+.tag { font: 600 10px var(--sans); background: var(--ink); color: var(--bg); padding: 0 3px; border-radius: 2px; }
+.msa { font: 12px/16px var(--mono); display: grid; gap: 8px; overflow-x: auto; }
+.msa .muted { font-family: var(--sans); color: var(--soft); }
+.msa .row { display: flex; white-space: nowrap; }
+.msa .id { flex: none; box-sizing: border-box; color: var(--soft); padding-right: 1ch; text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.msa .row.ref .id { color: var(--ink); font-weight: 600; }
+.msa .ruler { display: flex; height: 14px; font-size: 10.5px; line-height: 14px; color: var(--soft); }
+.msa .ruler-ticks { position: relative; flex: none; }
+.msa .ruler-ticks span { position: absolute; top: 0; }
+.msa .c { flex: none; width: 1ch; text-align: center; cursor: default; }
+.msa .c.gap { color: var(--soft); }
+.msa .c.marked { box-shadow: inset 0 0 0 1.5px var(--mark); }
+.msa .c.pointed { box-shadow: inset 0 0 0 2px var(--ink); }
+.readout { font-family: var(--mono); font-size: 11.5px; color: var(--ink); font-variant-numeric: tabular-nums; min-height: 3em; overflow-x: auto; }
+.readout .head { font-family: var(--sans); font-size: 12px; color: var(--soft); margin-bottom: 2px; }
+.readout table { border-collapse: collapse; font: inherit; }
+.readout td { padding: 1px 10px 1px 0; white-space: nowrap; }
+.readout td.num { text-align: right; }
+.readout tr.pointed td { font-weight: 600; background: var(--hoverrow); }
+.readout tr.hidden td { color: var(--soft); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-family: var(--mono); font-size: 11.5px; padding: 4px 7px; border-radius: 4px; white-space: nowrap; z-index: 5; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>__TITLE__</h1>
+    <p class="sub" id="summary"></p>
+  </header>
+
+  <div class="controls">
+    <div class="group"><span class="group-label">Colour by</span>
+      <div class="seg" role="group" aria-label="Colour by">
+        <button id="colour-lrmsd" aria-pressed="true">lrmsd</button><button id="colour-nlrmsd" aria-pressed="false">nlrmsd</button>
+      </div>
+    </div>
+    <div class="group"><span class="group-label">Columns</span>
+      <div class="seg" role="group" aria-label="Columns">
+        <button id="columns-alignment" aria-pressed="true">Whole alignment</button><button id="columns-sites" aria-pressed="false">Reference sites</button>
+      </div>
+    </div>
+    <div class="group"><span class="group-label" title="Keys: ← → move the mark along the chain (Shift: 10 residues), ↑ ↓ to the chain above or below, Esc removes it">3D</span>
+      <div class="seg" role="group" aria-label="3D representation">
+        <button id="trace" aria-pressed="true">Trace</button><button id="cartoon" aria-pressed="false">Cartoon</button>
+      </div>
+      <label class="check"><input type="checkbox" id="beads" checked> Beads</label>
+    </div>
+    <div class="group">
+      <button class="btn" id="show-all">Show all</button>
+      <button class="btn" id="clear">Clear</button>
+      <label class="check"><input type="checkbox" id="show-reference" checked> Reference</label>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="leftcol">
+      <section class="panel">
+        <h2>Alignment <span id="matrix-note"></span></h2>
+        <div class="matrix-box" id="matrix-box">
+          <canvas id="labels"></canvas>
+          <div class="scroller" id="scroller"><div class="cells-wrap"><canvas id="cells"></canvas><canvas id="overlay"></canvas></div></div>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <div class="legend" id="legend"></div>
+      </section>
+      <section class="panel">
+        <h2>Chains shown in 3D <span id="msa-note"></span></h2>
+        <div class="msa" id="msa"></div>
+      </section>
+    </div>
+    <section class="panel viewer-col">
+      <h2>3D <span id="shown-note"></span></h2>
+      <div id="stage"></div>
+      <div class="key">
+        <span><i class="refsw" style="background: var(--refchain)"></i>reference</span>
+        <span><i style="background: var(--mark); height: 8px; width: 8px; border-radius: 50%"></i>marked column</span>
+        <span><i style="background: var(--noref)"></i>no reference residue</span>
+        <span><b class="tag">N</b><b class="tag">C</b>ends</span>
+      </div>
+      <div class="readout" id="readout"></div>
+    </section>
+  </div>
+</div>
+
+<script id="data" type="application/json">
+__DATA__
+</script>
+<script>
+__3DMOL__
+</script>
+<script>
+(function () {
+  "use strict";
+
+  // =====================================================================================================
+  // The data, written by view_family().
+  // Each structure has arrays with one entry per alignment column (columns are numbered from 0), null where
+  // the structure has a gap: letter, resno, insert, resname, the coordinates ca, n, c and o ([x, y, z]),
+  // and distance (to the reference's Calpha in the same column).
+  // =====================================================================================================
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const STRUCTURES = DATA.structures;
+  const REF = DATA.reference;           // position of the reference in STRUCTURES
+  const N_COLUMNS = DATA.n_columns;
+  const CAP = DATA.cap;                 // colours saturate at lrmsd -CAP and +CAP
+  const ROWS = [REF].concat(DATA.order); // rows of the matrix: the reference, then the homologs (clustered order)
+
+  function hasResidue(k, a) {
+    return STRUCTURES[k].resno[a] !== null;
+  }
+
+  // For each structure: the columns where it has a residue, and whether its file had backbone atoms.
+  for (const s of STRUCTURES) {
+    s.columns = [];
+    s.hasBackbone = false;
+    for (let a = 0; a < N_COLUMNS; a++) {
+      if (s.resno[a] === null) continue;
+      s.columns.push(a);
+      if (s.n[a] !== null) s.hasBackbone = true;
+    }
+  }
+
+  // The two choices of matrix columns: every alignment column, or the reference sites.
+  const ALL_COLUMNS = [];
+  for (let a = 0; a < N_COLUMNS; a++) ALL_COLUMNS.push(a);
+  const SITE_COLUMNS = STRUCTURES[REF].columns;
+
+  // Text for a residue, as in its file: "LEU 25", or "LEU 25A" with an insertion code.
+  function residueText(k, a) {
+    const s = STRUCTURES[k];
+    return s.resname[a] + " " + s.resno[a] + (s.insert[a] === null ? "" : s.insert[a]);
+  }
+  // Text for a column: the reference residue there, if any.
+  function columnText(a) {
+    if (!hasResidue(REF, a)) return "column " + (a + 1) + ", no reference residue";
+    const ref = STRUCTURES[REF];
+    return "site " + ref.resno[a] + (ref.insert[a] === null ? "" : ref.insert[a]);
+  }
+
+  // =====================================================================================================
+  // What the page shows
+  // =====================================================================================================
+  const state = {
+    colourBy: "lrmsd",                 // "lrmsd" or "nlrmsd"
+    columns: "alignment",              // "alignment" (every column) or "sites" (the reference sites)
+    shown: new Set([REF, DATA.order[0], DATA.order[DATA.order.length - 1]]), // structures drawn in 3D
+    cartoon: false,                    // false: Calpha traces
+    beads: true,                       // spheres at the Calpha atoms
+    markColumn: -1,                    // the marked alignment column (-1: none)
+    markStructure: -1,                 // the structure pointed at (-1: none)
+    pinned: false,                     // the mark was set with the keys, so moving the pointer away keeps it
+    lastShown: null,                   // the structure shown last: the keys start there
+  };
+
+  function setShown(k, on) {
+    if (on) {
+      state.shown.add(k);
+      state.lastShown = k;
+    } else {
+      state.shown.delete(k);
+    }
+  }
+
+  // =====================================================================================================
+  // Colours
+  // =====================================================================================================
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  // the colours of the current theme (light or dark), read from the style sheet at every redraw
+  const theme = {};
+  function readTheme() {
+    for (const name of ["gap", "noref", "refrow", "refchain", "refink", "mark", "ink", "soft", "bg", "stage", "hoverrow", "mono", "sans"]) {
+      theme[name] = cssVar("--" + name);
+    }
+  }
+
+  // The lrmsd colour scale: red (#b2182b) at -CAP, white at 0, blue (#2166ac) at +CAP, interpolated in CIELAB
+  // as ggplot2's scale_fill_gradient2 does. SCALE holds 256 colours from -CAP to +CAP.
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function srgbToLinear(c) {
+    c = c / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function linearToSrgb(c) {
+    const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    return Math.round(Math.min(1, Math.max(0, v)) * 255);
+  }
+  const WHITE_POINT = [0.95047, 1, 1.08883];
+  function rgbToLab(rgb) {
+    const [r, g, b] = rgb.map(srgbToLinear);
+    const xyz = [
+      0.4124564 * r + 0.3575761 * g + 0.1804375 * b,
+      0.2126729 * r + 0.7151522 * g + 0.072175 * b,
+      0.0193339 * r + 0.119192 * g + 0.9503041 * b,
+    ];
+    const f = xyz.map((v, i) => {
+      const t = v / WHITE_POINT[i];
+      return t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116;
+    });
+    return [116 * f[1] - 16, 500 * (f[0] - f[1]), 200 * (f[1] - f[2])];
+  }
+  function labToRgb([L, a, b]) {
+    const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+    const inverse = (t) => (t * t * t > 216 / 24389 ? t * t * t : (116 * t - 16) / (24389 / 27));
+    const X = inverse(fx) * WHITE_POINT[0], Y = inverse(fy) * WHITE_POINT[1], Z = inverse(fz) * WHITE_POINT[2];
+    return [
+      3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
+      -0.969266 * X + 1.8760108 * Y + 0.041556 * Z,
+      0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
+    ].map(linearToSrgb);
+  }
+  const SCALE = [];
+  {
+    const red = rgbToLab(hexToRgb("#b2182b")), white = rgbToLab(hexToRgb("#ffffff")), blue = rgbToLab(hexToRgb("#2166ac"));
+    for (let i = 0; i < 256; i++) {
+      const t = (i / 255) * 2 - 1;               // -1 to 1
+      const end = t < 0 ? red : blue;
+      const lab = white.map((w, c) => w + (end[c] - w) * Math.abs(t));
+      SCALE.push("#" + labToRgb(lab).map((v) => v.toString(16).padStart(2, "0")).join(""));
+    }
+  }
+  function scaleColour(value) {
+    const t = Math.max(-1, Math.min(1, value / CAP));
+    return SCALE[Math.round((t + 1) / 2 * 255)];
+  }
+
+  // The value coloured at structure k, column a: lrmsd, the log of the distance to the reference (distances
+  // below 0.001 Angstrom count as 0.001), or nlrmsd, lrmsd minus the structure's mean lrmsd over the reference
+  // sites. null where there is no distance.
+  function valueAt(k, a) {
+    const s = STRUCTURES[k];
+    if (s.distance[a] === null) return null;
+    const lrmsd = Math.log(Math.max(s.distance[a], 0.001));
+    return state.colourBy === "nlrmsd" ? lrmsd - s.mean_lrmsd : lrmsd;
+  }
+
+  // Colour of a residue in the matrix and in the alignment panel.
+  function cellColour(k, a) {
+    if (!hasResidue(k, a)) return theme.gap;
+    if (k === REF) return theme.refrow;
+    const value = valueAt(k, a);
+    if (value === null) return theme.noref;
+    return scaleColour(value);
+  }
+  // Colour of a residue in 3D: the reference in its own colour.
+  function colourIn3D(k, a) {
+    return k === REF ? theme.refchain : cellColour(k, a);
+  }
+
+  // =====================================================================================================
+  // Controls
+  // =====================================================================================================
+  function byId(id) {
+    return document.getElementById(id);
+  }
+  let scrollToReference = true;  // after a change of columns, open the matrix at the reference's first residue
+
+  byId("colour-lrmsd").addEventListener("click", () => { state.colourBy = "lrmsd"; redraw(); });
+  byId("colour-nlrmsd").addEventListener("click", () => { state.colourBy = "nlrmsd"; redraw(); });
+  byId("columns-alignment").addEventListener("click", () => { state.columns = "alignment"; scrollToReference = true; removeMark(); redraw(); });
+  byId("columns-sites").addEventListener("click", () => { state.columns = "sites"; scrollToReference = true; removeMark(); redraw(); });
+  byId("trace").addEventListener("click", () => { state.cartoon = false; redraw(); });
+  byId("cartoon").addEventListener("click", () => { state.cartoon = true; redraw(); });
+  byId("beads").addEventListener("change", (event) => { state.beads = event.target.checked; redraw(); });
+  byId("show-all").addEventListener("click", () => { for (const k of DATA.order) setShown(k, true); redraw(); });
+  byId("clear").addEventListener("click", () => { for (const k of DATA.order) setShown(k, false); redraw(); });
+  byId("show-reference").addEventListener("change", (event) => { setShown(REF, event.target.checked); redraw(); });
+
+  function updateControls() {
+    byId("colour-lrmsd").setAttribute("aria-pressed", String(state.colourBy === "lrmsd"));
+    byId("colour-nlrmsd").setAttribute("aria-pressed", String(state.colourBy === "nlrmsd"));
+    byId("columns-alignment").setAttribute("aria-pressed", String(state.columns === "alignment"));
+    byId("columns-sites").setAttribute("aria-pressed", String(state.columns === "sites"));
+    byId("trace").setAttribute("aria-pressed", String(!state.cartoon));
+    byId("cartoon").setAttribute("aria-pressed", String(state.cartoon));
+    byId("beads").checked = state.beads;
+    byId("show-reference").checked = state.shown.has(REF);
+    const columns = state.columns === "alignment" ? N_COLUMNS + " alignment columns" : SITE_COLUMNS.length + " reference sites";
+    byId("summary").textContent = DATA.order.length + " homologs · reference " + STRUCTURES[REF].id + " · " + columns;
+    byId("matrix-note").textContent = state.colourBy;
+    drawLegend();
+  }
+
+  function drawLegend() {
+    const swatch = (colour, text) => '<span><i style="background:' + colour + '"></i>' + text + "</span>";
+    const stops = [];
+    for (let i = 0; i <= 20; i++) stops.push(SCALE[Math.round(i / 20 * 255)] + " " + (i * 5) + "%");
+    // ticks at distances (or ratios to the structure's mean) 1/4, 1/2, 1, 2 and 4
+    const tickText = state.colourBy === "nlrmsd"
+      ? { 0.25: "×¼", 0.5: "×½", 1: "own mean", 2: "×2", 4: "×4" }
+      : { 0.25: "0.25", 0.5: "0.5", 1: "1", 2: "2", 4: "4 Å" };
+    let ticks = "";
+    for (const d of [0.25, 0.5, 1, 2, 4]) {
+      const left = (Math.log(d) / CAP + 1) / 2 * 100;
+      const shift = d === 0.25 ? ";transform:translateX(0)" : d === 4 ? ";transform:translateX(-100%)" : "";
+      ticks += '<span style="left:' + left + "%" + shift + '">' + tickText[d] + "</span>";
+    }
+    byId("legend").innerHTML =
+      '<div class="ramp" style="background:linear-gradient(90deg,' + stops.join(",") + ')"></div>' +
+      '<div class="ticks">' + ticks + "</div>" +
+      '<div class="swatches">' + swatch("var(--noref)", "no reference residue") + swatch("var(--gap)", "gap") + swatch("var(--refrow)", "reference row") + "</div>";
+  }
+
+  // =====================================================================================================
+  // The matrix: three canvases. "labels" holds the row names and does not scroll; "cells" holds the colours
+  // and scrolls sideways; "overlay", on top of the cells, holds the marks that follow the pointer.
+  // =====================================================================================================
+  const AXIS_HEIGHT = 44;
+  const matrixBox = byId("matrix-box"), scroller = byId("scroller");
+  const labelsCanvas = byId("labels"), cellsCanvas = byId("cells"), overlayCanvas = byId("overlay");
+  const labelsCtx = labelsCanvas.getContext("2d"), cellsCtx = cellsCanvas.getContext("2d"), overlayCtx = overlayCanvas.getContext("2d");
+  const tip = byId("tip");
+  let grid = null; // the matrix geometry, set by layoutMatrix()
+
+  function sizeCanvas(canvas, ctx, width, height) {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function layoutMatrix() {
+    const columns = state.columns === "alignment" ? ALL_COLUMNS : SITE_COLUMNS;
+    const rowHeight = Math.max(5, Math.min(16, Math.floor(620 / ROWS.length)));
+    const fontSize = Math.max(7, Math.min(11, rowHeight - 3));
+    // the label column is as wide as the longest identifier
+    labelsCtx.font = "600 " + fontSize + "px " + theme.mono;
+    let widest = 0;
+    for (const k of ROWS) widest = Math.max(widest, labelsCtx.measureText(STRUCTURES[k].id).width);
+    const labelWidth = Math.ceil(widest) + 14;
+    // every column fits in the panel, so a column can be narrower than a pixel
+    const cellWidth = Math.max(160, matrixBox.clientWidth - labelWidth) / columns.length;
+    const indexOfColumn = new Map();
+    columns.forEach((a, j) => indexOfColumn.set(a, j));
+    grid = {
+      columns,               // the alignment column shown at each position j of the matrix
+      indexOfColumn,         // the position j of each alignment column shown
+      rowHeight, fontSize, labelWidth, cellWidth,
+      width: Math.round(cellWidth * columns.length),
+      height: rowHeight * ROWS.length + AXIS_HEIGHT,
+    };
+    sizeCanvas(labelsCanvas, labelsCtx, labelWidth, grid.height);
+    sizeCanvas(cellsCanvas, cellsCtx, grid.width, grid.height);
+    sizeCanvas(overlayCanvas, overlayCtx, grid.width, grid.height);
+  }
+  function cellLeft(j) { return Math.round(j * grid.cellWidth); }
+  function cellRight(j) { return Math.round((j + 1) * grid.cellWidth); }
+  function rowTop(r) { return r * grid.rowHeight; }
+  function axisTop() { return ROWS.length * grid.rowHeight; }
+
+  function drawCells() {
+    cellsCtx.clearRect(0, 0, grid.width, grid.height);
+    // Paint one pixel per column, rows at their height in device pixels, then scale the picture to the
+    // panel width in one step: columns narrower than a pixel are averaged, wider ones stay sharp.
+    const dpr = window.devicePixelRatio || 1;
+    const rowPixels = Math.round(grid.rowHeight * dpr);
+    const picture = document.createElement("canvas");
+    picture.width = grid.columns.length;
+    picture.height = ROWS.length * rowPixels;
+    const ctx = picture.getContext("2d");
+    for (let r = 0; r < ROWS.length; r++) {
+      for (let j = 0; j < grid.columns.length; j++) {
+        ctx.fillStyle = cellColour(ROWS[r], grid.columns[j]);
+        ctx.fillRect(j, r * rowPixels, 1, rowPixels);
+      }
+    }
+    cellsCtx.imageSmoothingEnabled = grid.cellWidth * dpr < 1;
+    cellsCtx.imageSmoothingQuality = "high";
+    cellsCtx.drawImage(picture, 0, 0, grid.width, ROWS.length * grid.rowHeight);
+
+    // axis, first line: the reference's residue numbers, at round numbers
+    const y = axisTop();
+    cellsCtx.strokeStyle = theme.soft;
+    cellsCtx.fillStyle = theme.soft;
+    cellsCtx.lineWidth = 1;
+    cellsCtx.textAlign = "center";
+    cellsCtx.textBaseline = "top";
+    cellsCtx.font = "10.5px " + theme.mono;
+    const ref = STRUCTURES[REF];
+    const step = [10, 20, 50, 100].find((k) => k * grid.cellWidth >= 30) || 200;
+    for (let j = 0; j < grid.columns.length; j++) {
+      const a = grid.columns[j];
+      if (!hasResidue(REF, a) || ref.resno[a] % step !== 0 || ref.insert[a] !== null) continue;
+      const x = (cellLeft(j) + cellRight(j)) / 2;
+      cellsCtx.beginPath(); cellsCtx.moveTo(x, y); cellsCtx.lineTo(x, y + 4); cellsCtx.stroke();
+      cellsCtx.fillText(String(ref.resno[a]), x, y + 6);
+    }
+    // axis, second line (whole alignment only): alignment column numbers, counted from 1
+    if (state.columns === "alignment") {
+      const columnStep = [10, 25, 50, 100, 200].find((k) => k * grid.cellWidth >= 40) || 500;
+      cellsCtx.globalAlpha = 0.75;
+      for (let j = columnStep - 1; j < grid.columns.length; j += columnStep) {
+        const x = (cellLeft(j) + cellRight(j)) / 2;
+        cellsCtx.beginPath(); cellsCtx.moveTo(x, y + 20); cellsCtx.lineTo(x, y + 24); cellsCtx.stroke();
+        cellsCtx.fillText(String(j + 1), x, y + 26);
+      }
+      cellsCtx.globalAlpha = 1;
+    }
+  }
+
+  function drawLabels() {
+    labelsCtx.clearRect(0, 0, grid.labelWidth, grid.height);
+    labelsCtx.textBaseline = "middle";
+    labelsCtx.textAlign = "right";
+    for (let r = 0; r < ROWS.length; r++) {
+      const k = ROWS[r], y = rowTop(r), shown = state.shown.has(k), pointed = k === state.markStructure;
+      if (pointed) {
+        labelsCtx.fillStyle = theme.hoverrow;
+        labelsCtx.fillRect(0, y, grid.labelWidth, grid.rowHeight);
+      }
+      if (shown) { // a bar at the left of the rows shown in 3D
+        labelsCtx.fillStyle = k === REF ? theme.refchain : theme.ink;
+        labelsCtx.fillRect(0, y + 1, 4, grid.rowHeight - 2);
+      }
+      if (grid.rowHeight >= 7) {
+        labelsCtx.font = (shown || pointed ? "600 " : "400 ") + grid.fontSize + "px " + theme.mono;
+        labelsCtx.fillStyle = shown ? theme.ink : theme.soft;
+        labelsCtx.fillText(STRUCTURES[k].id, grid.labelWidth - 6, y + grid.rowHeight / 2 + 0.5);
+      }
+    }
+    labelsCtx.textAlign = "left";
+    labelsCtx.textBaseline = "top";
+    labelsCtx.fillStyle = theme.soft;
+    labelsCtx.font = "10.5px " + theme.sans;
+    labelsCtx.fillText("site", 6, axisTop() + 6);
+    if (state.columns === "alignment") labelsCtx.fillText("column", 6, axisTop() + 26);
+  }
+
+  function drawOverlay() {
+    overlayCtx.clearRect(0, 0, grid.width, grid.height);
+    const pointedRow = ROWS.indexOf(state.markStructure);
+    if (pointedRow >= 0) { // a thin frame around the row pointed at
+      overlayCtx.lineWidth = 1;
+      overlayCtx.strokeStyle = theme.soft;
+      overlayCtx.strokeRect(0.5, rowTop(pointedRow) + 0.5, grid.width - 1, grid.rowHeight - 1);
+    }
+    const j = grid.indexOfColumn.has(state.markColumn) ? grid.indexOfColumn.get(state.markColumn) : -1;
+    if (j < 0) return;
+    const width = Math.max(2, cellRight(j) - cellLeft(j));
+    // the marked column: a bar under the matrix, and a frame on each row shown in 3D
+    overlayCtx.fillStyle = theme.mark;
+    overlayCtx.fillRect(cellLeft(j), axisTop() + 1, width, 4);
+    overlayCtx.lineWidth = 1.5;
+    overlayCtx.strokeStyle = theme.mark;
+    for (let r = 0; r < ROWS.length; r++) {
+      if (state.shown.has(ROWS[r])) overlayCtx.strokeRect(cellLeft(j) - 0.75, rowTop(r) + 0.75, width + 1.5, grid.rowHeight - 1.5);
+    }
+    // the cell pointed at: a thicker frame
+    if (pointedRow >= 0) {
+      overlayCtx.lineWidth = 2.5;
+      overlayCtx.strokeStyle = theme.ink;
+      overlayCtx.strokeRect(cellLeft(j) - 1.25, rowTop(pointedRow) - 0.25, width + 2.5, grid.rowHeight + 0.5);
+    }
+  }
+
+  // Bring a column into view, if it is out of view.
+  function scrollMatrixTo(a) {
+    if (!grid.indexOfColumn.has(a)) return;
+    const j = grid.indexOfColumn.get(a);
+    const x = (cellLeft(j) + cellRight(j)) / 2;
+    if (x < scroller.scrollLeft + 20 || x > scroller.scrollLeft + scroller.clientWidth - 20) {
+      scroller.scrollLeft = x - scroller.clientWidth / 2;
+    }
+  }
+
+  // ---- the pointer on the matrix: a click shows or hides a row in 3D; dragging does it for several rows;
+  // pointing at a cell marks its column ----
+
+  // The row r and matrix position j under the pointer (j = -1 on the labels), or null.
+  function cellAt(event, canvas) {
+    const box = canvas.getBoundingClientRect();
+    const x = event.clientX - box.left, y = event.clientY - box.top;
+    const r = Math.floor(y / grid.rowHeight);
+    if (y < 0 || r >= ROWS.length) return null;
+    const j = canvas === labelsCanvas ? -1 : Math.max(0, Math.min(grid.columns.length - 1, Math.floor(x / grid.cellWidth)));
+    return { r, j };
+  }
+
+  let drag = null; // while the mouse button is held on a homolog row: { fromRow, adding, before }
+  function onPointerDown(event, canvas) {
+    const cell = cellAt(event, canvas);
+    if (!cell) return;
+    const k = ROWS[cell.r];
+    const adding = !state.shown.has(k);
+    if (cell.r > 0 && event.pointerType !== "touch") {
+      drag = { fromRow: cell.r, adding, before: new Set(state.shown) };
+      canvas.setPointerCapture(event.pointerId);
+    }
+    setShown(k, adding);
+    redraw();
+  }
+  function onPointerMove(event, canvas) {
+    const cell = cellAt(event, canvas);
+    if (drag && cell && cell.r > 0) {
+      // every homolog row from the first one to this one, shown or hidden as the first one was
+      const shown = new Set(drag.before);
+      for (let r = Math.min(drag.fromRow, cell.r); r <= Math.max(drag.fromRow, cell.r); r++) {
+        if (drag.adding) shown.add(ROWS[r]); else shown.delete(ROWS[r]);
+      }
+      const changed = shown.size !== state.shown.size || [...shown].some((k) => !state.shown.has(k));
+      if (changed) {
+        state.shown = shown;
+        redraw();
+      }
+    }
+    pointAt(cell, event);
+  }
+  function onPointerLeave() {
+    if (drag) return;
+    tip.hidden = true;
+    if (!state.pinned) removeMark();
+  }
+  for (const canvas of [labelsCanvas, overlayCanvas]) {
+    canvas.addEventListener("pointerdown", (event) => onPointerDown(event, canvas));
+    canvas.addEventListener("pointermove", (event) => onPointerMove(event, canvas));
+    canvas.addEventListener("pointerup", () => { drag = null; });
+    canvas.addEventListener("pointercancel", () => { drag = null; });
+    canvas.addEventListener("pointerleave", onPointerLeave);
+  }
+
+  // The tooltip, and the mark, for the cell (or row name) under the pointer.
+  function pointAt(cell, event) {
+    state.pinned = false;
+    if (!cell) {
+      tip.hidden = true;
+      removeMark();
+      return;
+    }
+    const k = ROWS[cell.r], s = STRUCTURES[k];
+    if (cell.j < 0) {
+      tip.textContent = k === REF
+        ? s.id + " (reference)"
+        : s.id + " · identity " + s.identity.toFixed(2) + " · core " + s.core + " of " + s.shared + " residues";
+      setMark(-1, k);
+    } else {
+      const a = grid.columns[cell.j];
+      tip.textContent = s.id + " · " + columnText(a) + " · " + residueAndDistanceText(k, a);
+      setMark(a, k);
+    }
+    tip.hidden = false;
+    const box = matrixBox.getBoundingClientRect();
+    tip.style.left = Math.max(0, Math.min(event.clientX - box.left + 12, matrixBox.clientWidth - tip.offsetWidth)) + "px";
+    tip.style.top = (event.clientY - box.top + 16) + "px";
+  }
+
+  function residueAndDistanceText(k, a) {
+    if (!hasResidue(k, a)) return "gap";
+    let text = residueText(k, a);
+    if (k === REF) return text;
+    const distance = STRUCTURES[k].distance[a];
+    if (distance === null) return text + " · no reference residue";
+    text += " · " + distance.toFixed(2) + " Å";
+    if (state.colourBy === "nlrmsd") text += " · nlrmsd " + valueAt(k, a).toFixed(2);
+    return text;
+  }
+
+  // =====================================================================================================
+  // 3D
+  // =====================================================================================================
+  const stage = byId("stage");
+  const viewer = $3Dmol.createViewer(stage, { backgroundColor: cssVar("--stage"), antialias: true });
+  let models = [];    // one per structure shown: { structure, model, columnOfAtom }
+  let markCount = 0;  // spheres drawn at the marked column
+
+  // 3Dmol only sees the pointer inside its canvas, so it never reports the pointer leaving: remove the mark here.
+  stage.addEventListener("pointerleave", () => { if (!state.pinned) removeMark(); });
+
+  // One ATOM line of a PDB file.
+  function pdbAtomLine(serial, name, element, resname, resno, insert, xyz) {
+    const number = (v) => v.toFixed(3).padStart(8);
+    return "ATOM  " + String(serial).padStart(5) + " " + name + " " + resname.padEnd(3).slice(0, 3) + " A" +
+      String(resno).padStart(4) + (insert === null ? " " : insert) + "   " +
+      number(xyz[0]) + number(xyz[1]) + number(xyz[2]) + "  1.00  0.00          " + element.padStart(2);
+  }
+
+  // A structure as PDB text for 3Dmol: its Calpha atoms, or (backbone true) the N, CA, C and O atoms of each
+  // residue, those its file had. columnOfAtom[serial] is the alignment column of each atom, used to find the
+  // column of an atom under the pointer and to colour it.
+  function structureAsPdb(k, backbone) {
+    const s = STRUCTURES[k];
+    const lines = [];
+    const columnOfAtom = [];
+    function addAtom(name, element, a, xyz) {
+      const serial = lines.length + 1;
+      columnOfAtom[serial] = a;
+      lines.push(pdbAtomLine(serial, name, element, s.resname[a], s.resno[a], s.insert[a], xyz));
+    }
+    for (const a of s.columns) {
+      if (backbone && s.n[a] !== null) addAtom(" N  ", "N", a, s.n[a]);
+      addAtom(" CA ", "C", a, s.ca[a]);
+      if (backbone && s.c[a] !== null) addAtom(" C  ", "C", a, s.c[a]);
+      if (backbone && s.o[a] !== null) addAtom(" O  ", "O", a, s.o[a]);
+    }
+    return { text: lines.join("\n") + "\nEND\n", columnOfAtom };
+  }
+
+  function build3D(zoomToAll) {
+    viewer.removeAllModels();
+    viewer.removeAllLabels();
+    viewer.setBackgroundColor(theme.stage);
+    models = [];
+    let traces = 0; // structures drawn as traces although cartoons were asked for
+    for (const k of ROWS) {
+      if (!state.shown.has(k)) continue;
+      const cartoon = state.cartoon && STRUCTURES[k].hasBackbone;
+      if (state.cartoon && !cartoon) traces += 1;
+      const pdb = structureAsPdb(k, cartoon);
+      const model = viewer.addModel(pdb.text, "pdb");
+      models.push({ structure: k, model, columnOfAtom: pdb.columnOfAtom });
+
+      const isRef = k === REF;
+      const colorfunc = (atom) => colourIn3D(k, pdb.columnOfAtom[atom.serial]);
+      const chainStyle = cartoon
+        ? { cartoon: { colorfunc, arrows: true, thickness: isRef ? 0.5 : 0.4 } }
+        : { cartoon: { style: "trace", colorfunc, thickness: isRef ? 0.36 : 0.3 } };
+      model.setStyle({}, chainStyle);
+      // at the Calpha atoms: beads, or (beads off) invisible spheres, so that the pointer still finds each residue
+      const atCalpha = state.beads ? { sphere: { radius: isRef ? 0.55 : 0.62, colorfunc } } : { clicksphere: { radius: 0.9 } };
+      model.setStyle({ atom: "CA" }, Object.assign({}, chainStyle, atCalpha));
+
+      // the ends of the chain, N and C, at the first and last Calpha
+      const s = STRUCTURES[k];
+      const ends = [[s.columns[0], "N"], [s.columns[s.columns.length - 1], "C"]];
+      for (const [a, text] of ends) {
+        viewer.addLabel(text, {
+          position: { x: s.ca[a][0], y: s.ca[a][1], z: s.ca[a][2] },
+          font: "sans-serif", fontSize: isRef ? 14 : 11, alignment: "center", inFront: true,
+          fontColor: isRef ? theme.refink : theme.bg, backgroundColor: isRef ? theme.refchain : theme.ink,
+          backgroundOpacity: isRef ? 1 : 0.85, borderThickness: isRef ? 1 : 0, borderColor: theme.refink,
+        });
+      }
+    }
+    const homologsShown = DATA.order.filter((k) => state.shown.has(k)).length;
+    byId("shown-note").textContent = homologsShown + " of " + DATA.order.length + " homologs" +
+      (traces > 0 ? " · " + traces + " drawn as traces: no backbone atoms" : "");
+    viewer.setHoverable({}, true, onHover3D, onUnhover3D);
+    viewer.setHoverDuration(40);
+    if (zoomToAll) viewer.zoomTo();
+    drawMarks3D();
+  }
+
+  // Spheres at the marked column, on every structure shown; a larger one on the structure pointed at.
+  function drawMarks3D() {
+    viewer.removeAllShapes();
+    markCount = 0;
+    const a = state.markColumn;
+    if (a >= 0) {
+      for (const m of models) {
+        const s = STRUCTURES[m.structure];
+        if (!hasResidue(m.structure, a)) continue;
+        const radius = m.structure === state.markStructure ? 1.4 : 1.0;
+        viewer.addSphere({ center: { x: s.ca[a][0], y: s.ca[a][1], z: s.ca[a][2] }, radius, color: theme.mark });
+        markCount += 1;
+      }
+    }
+    viewer.render();
+  }
+
+  function onHover3D(atom) {
+    const m = models.find((x) => x.model.getID() === atom.model);
+    if (!m) return;
+    state.pinned = false;
+    setMark(m.columnOfAtom[atom.serial], m.structure, true);
+  }
+  function onUnhover3D() {
+    if (!state.pinned) removeMark();
+  }
+
+  // =====================================================================================================
+  // The alignment of the structures shown in 3D: their rows of the alignment, without the columns where all of
+  // them have gaps, coloured as in the matrix, and wrapped in blocks that fit the panel.
+  // =====================================================================================================
+  const msa = byId("msa");
+  let msaCells = new Map(); // alignment column -> the letters shown in that column: [{ element, structure }]
+  let msaWidth = -1;        // panel width at the last build
+
+  // white letters on dark backgrounds, near-black ones on light backgrounds
+  function textColourOn(hex) {
+    const [r, g, b] = hexToRgb(hex).map(srgbToLinear);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.3 ? "#ffffff" : "#1c1c1a";
+  }
+
+  function buildAlignmentPanel() {
+    msa.textContent = "";
+    msaCells = new Map();
+    msaWidth = msa.clientWidth;
+    const rows = models.map((m) => m.structure);
+    const columns = ALL_COLUMNS.filter((a) => rows.some((k) => hasResidue(k, a)));
+    byId("msa-note").textContent = rows.length > 0 ? columns.length + " of " + N_COLUMNS + " columns" : "";
+    if (rows.length === 0) {
+      const note = document.createElement("div");
+      note.className = "muted";
+      note.textContent = "Nothing shown. Click a row.";
+      msa.appendChild(note);
+      return;
+    }
+    // block width: as many columns as fit, a multiple of 10 (measured on hidden text)
+    const probe = document.createElement("span");
+    probe.textContent = "0000000000";
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre";
+    msa.appendChild(probe);
+    const charWidth = probe.getBoundingClientRect().width / 10;
+    probe.remove();
+    const idWidth = Math.max(...rows.map((k) => STRUCTURES[k].id.length)) + 1;
+    const perBlock = Math.max(10, Math.floor((msaWidth / charWidth - idWidth) / 10) * 10);
+
+    const ref = STRUCTURES[REF];
+    for (let start = 0; start < columns.length; start += perBlock) {
+      const blockColumns = columns.slice(start, start + perBlock);
+      const block = document.createElement("div");
+
+      // ruler: the reference's residue numbers, every 10, above their column
+      const ruler = document.createElement("div");
+      ruler.className = "ruler";
+      const pad = document.createElement("span");
+      pad.style.width = idWidth + "ch";
+      pad.style.flex = "none";
+      ruler.appendChild(pad);
+      const ticks = document.createElement("div");
+      ticks.className = "ruler-ticks";
+      ticks.style.width = blockColumns.length + "ch";
+      blockColumns.forEach((a, i) => {
+        if (!hasResidue(REF, a) || ref.resno[a] % 10 !== 0 || ref.insert[a] !== null) return;
+        const tick = document.createElement("span");
+        tick.style.left = i + "ch";
+        tick.textContent = ref.resno[a];
+        ticks.appendChild(tick);
+      });
+      ruler.appendChild(ticks);
+      block.appendChild(ruler);
+
+      // one line per structure
+      for (const k of rows) {
+        const line = document.createElement("div");
+        line.className = k === REF ? "row ref" : "row";
+        const id = document.createElement("span");
+        id.className = "id";
+        id.style.width = idWidth + "ch";
+        id.textContent = STRUCTURES[k].id;
+        line.appendChild(id);
+        for (const a of blockColumns) {
+          const letter = document.createElement("span");
+          letter.dataset.column = a;
+          letter.dataset.structure = k;
+          if (hasResidue(k, a)) {
+            const colour = cellColour(k, a);
+            letter.className = "c";
+            letter.style.background = colour;
+            letter.style.color = textColourOn(colour);
+            letter.textContent = STRUCTURES[k].letter[a];
+          } else {
+            letter.className = "c gap";
+            letter.textContent = "-";
+          }
+          if (!msaCells.has(a)) msaCells.set(a, []);
+          msaCells.get(a).push({ element: letter, structure: k });
+          line.appendChild(letter);
+        }
+        block.appendChild(line);
+      }
+      msa.appendChild(block);
+    }
+    markAlignmentPanel();
+  }
+
+  let markedLetters = [];
+  function markAlignmentPanel() {
+    for (const element of markedLetters) element.classList.remove("marked", "pointed");
+    markedLetters = [];
+    if (!msaCells.has(state.markColumn)) return;
+    for (const cell of msaCells.get(state.markColumn)) {
+      cell.element.classList.add(cell.structure === state.markStructure ? "pointed" : "marked");
+      markedLetters.push(cell.element);
+    }
+  }
+
+  msa.addEventListener("pointerover", (event) => {
+    const letter = event.target.closest ? event.target.closest(".c") : null;
+    if (!letter) return;
+    state.pinned = false;
+    setMark(Number(letter.dataset.column), Number(letter.dataset.structure));
+  });
+  msa.addEventListener("pointerleave", () => { if (!state.pinned) removeMark(); });
+
+  // =====================================================================================================
+  // The readout under the 3D view: the marked column on every structure shown, and on the structure pointed
+  // at if it is not shown.
+  // =====================================================================================================
+  function writeReadout() {
+    const readout = byId("readout");
+    readout.textContent = "";
+    const a = state.markColumn;
+    if (a < 0) return;
+    const head = document.createElement("div");
+    head.className = "head";
+    head.textContent = columnText(a).replace(/^./, (c) => c.toUpperCase()) + (hasResidue(REF, a) ? " · column " + (a + 1) : "");
+    readout.appendChild(head);
+
+    const lines = models.map((m) => ({ k: m.structure, shown: true }));
+    if (state.markStructure >= 0 && !state.shown.has(state.markStructure)) lines.push({ k: state.markStructure, shown: false });
+    const table = document.createElement("table");
+    for (const line of lines) {
+      const k = line.k, s = STRUCTURES[k], present = hasResidue(k, a);
+      let distance = "", nlrmsd = "";
+      if (k !== REF && present) {
+        distance = s.distance[a] === null ? "no ref. residue" : s.distance[a].toFixed(2) + " Å";
+        if (state.colourBy === "nlrmsd" && s.distance[a] !== null) nlrmsd = "nlrmsd " + valueAt(k, a).toFixed(2);
+      }
+      const texts = [s.id + (k === REF ? " (ref)" : ""), present ? residueText(k, a) : "gap", distance, nlrmsd, line.shown ? "" : "not shown"];
+      const row = document.createElement("tr");
+      if (k === state.markStructure) row.classList.add("pointed");
+      if (!line.shown) row.classList.add("hidden");
+      texts.forEach((text, i) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        if (i === 2 || i === 3) td.className = "num";
+        row.appendChild(td);
+      });
+      table.appendChild(row);
+    }
+    readout.appendChild(table);
+  }
+
+  // =====================================================================================================
+  // The mark: one alignment column, and the structure pointed at. Shown in the matrix, the 3D view, the
+  // alignment panel and the readout.
+  // =====================================================================================================
+  function setMark(column, structure, scroll) {
+    if (column === state.markColumn && structure === state.markStructure) return;
+    state.markColumn = column;
+    state.markStructure = structure;
+    drawOverlay();
+    drawLabels();
+    drawMarks3D();
+    markAlignmentPanel();
+    writeReadout();
+    if (scroll && column >= 0) scrollMatrixTo(column);
+  }
+  function removeMark() {
+    state.pinned = false;
+    setMark(-1, -1);
+  }
+
+  // Keys: left and right move the mark along a structure shown (Shift: 10 residues); up and down move it to the
+  // structure shown above or below, in the same column; Esc removes it.
+  document.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === "Escape") {
+      if (state.markColumn >= 0 || state.markStructure >= 0) {
+        event.preventDefault();
+        tip.hidden = true;
+        removeMark();
+      }
+      return;
+    }
+    const shownRows = models.map((m) => m.structure); // top to bottom
+    const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    if (!arrows.includes(event.key) || shownRows.length === 0) return;
+
+    let k = state.markStructure;
+    let a = state.markColumn;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (k < 0) return; // nothing marked yet: leave the page's own scrolling alone
+      const i = shownRows.indexOf(k);
+      const next = i < 0 ? 0 : Math.max(0, Math.min(shownRows.length - 1, i + (event.key === "ArrowDown" ? 1 : -1)));
+      k = shownRows[next];
+      if (a < 0) a = STRUCTURES[k].columns[0];
+    } else {
+      if (k < 0) {
+        k = shownRows.includes(state.lastShown) ? state.lastShown : shownRows[shownRows.length - 1];
+        a = -1;
+      }
+      const columns = STRUCTURES[k].columns; // where structure k has residues
+      const step = event.shiftKey ? 10 : 1;
+      let i;
+      if (a < 0) {
+        i = event.key === "ArrowRight" ? 0 : columns.length - 1;
+      } else if (event.key === "ArrowRight") {
+        const after = columns.findIndex((c) => c > a); // the next residue
+        i = after < 0 ? columns.length - 1 : Math.min(columns.length - 1, after + step - 1);
+      } else {
+        let before = -1; // the previous residue
+        for (let n = columns.length - 1; n >= 0; n--) {
+          if (columns[n] < a) { before = n; break; }
+        }
+        i = before < 0 ? 0 : Math.max(0, before - step + 1);
+      }
+      a = columns[i];
+    }
+    event.preventDefault();
+    tip.hidden = true;
+    state.pinned = true;
+    setMark(a, k, true);
+  });
+
+  // =====================================================================================================
+  // Redraw everything, at most once per frame.
+  // =====================================================================================================
+  let redrawScheduled = false;
+  let zoomRequested = false;
+  function redraw(zoomToAll) {
+    if (zoomToAll) zoomRequested = true;
+    if (redrawScheduled) return;
+    redrawScheduled = true;
+    requestAnimationFrame(() => {
+      redrawScheduled = false;
+      readTheme();
+      updateControls();
+      layoutMatrix();
+      drawCells();
+      drawOverlay();
+      drawLabels();
+      build3D(zoomRequested);
+      zoomRequested = false;
+      buildAlignmentPanel();
+      writeReadout();
+      if (scrollToReference) {
+        scrollToReference = false;
+        const firstJ = grid.indexOfColumn.get(SITE_COLUMNS[0]);
+        scroller.scrollLeft = Math.max(0, cellLeft(firstJ) - 3 * grid.cellWidth);
+      }
+    });
+  }
+
+  // when the panel changes width: lay the matrix out again, and rebuild the alignment panel's blocks
+  new ResizeObserver(() => {
+    if (!grid) return;
+    layoutMatrix();
+    drawCells();
+    drawOverlay();
+    drawLabels();
+    viewer.resize();
+    viewer.render();
+    if (msa.clientWidth !== msaWidth) buildAlignmentPanel();
+  }).observe(matrixBox);
+  // when the theme changes
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redraw());
+  new MutationObserver(() => redraw()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // For automated checks of the page; the page itself does not use this.
+  window.__view = {
+    state: () => ({
+      colourBy: state.colourBy, columns: state.columns, cartoon: state.cartoon, beads: state.beads, pinned: state.pinned,
+      markColumn: state.markColumn, markStructure: state.markStructure, shown: [...state.shown],
+    }),
+    rows: () => ROWS.slice(),
+    grid: () => ({ rowHeight: grid.rowHeight, cellWidth: grid.cellWidth, columns: grid.columns.slice() }),
+    scroll: () => ({ left: scroller.scrollLeft, width: scroller.clientWidth }),
+    models: () => models.map((m) => ({
+      structure: m.structure,
+      calpha: m.model.selectedAtoms({ atom: "CA" }).length,
+      atoms: m.model.selectedAtoms({}).length,
+      beads: m.model.selectedAtoms({ atom: "CA" }).filter((x) => x.style.sphere).length,
+      first: (() => { const x = m.model.selectedAtoms({ atom: "CA" })[0]; return [x.x, x.y, x.z]; })(),
+    })),
+    marks: () => markCount,
+    // each structure shown: its letters in the alignment panel, all blocks joined
+    alignmentRows: () => models.map((m) => [...msa.querySelectorAll('.c[data-structure="' + m.structure + '"]')].map((c) => c.textContent).join("")),
+    readout: () => byId("readout").innerText,
+    // screen position (in the window) of the Calpha of structure k at column a, for simulated pointing in 3D
+    screenOf: (k, a) => {
+      const s = STRUCTURES[k];
+      const p = viewer.modelToScreen({ x: s.ca[a][0], y: s.ca[a][1], z: s.ca[a][2] });
+      return { x: p.x - window.pageXOffset, y: p.y - window.pageYOffset };
+    },
+  };
+
+  redraw(true);
+  if (document.fonts) document.fonts.ready.then(() => redraw()); // label widths in the loaded font
+})();
+</script>
+</body>
+</html>

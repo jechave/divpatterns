@@ -8,12 +8,25 @@
 \description{
 Functions to calculate and analyse patterns of protein evolutionary divergence at the sequence, structure and motion levels, from homologous proteins, given their structures and a sequence alignment.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/jechave/divpatterns}
+  \item Report bugs at \url{https://github.com/jechave/divpatterns/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Julian Echave \email{jechave@unsam.edu.ar} (\href{https://orcid.org/0000-0003-0678-5593}{ORCID})
 
 Authors:
 \itemize{
   \item Julian Echave \email{jechave@unsam.edu.ar} (\href{https://orcid.org/0000-0003-0678-5593}{ORCID})
+}
+
+Other contributors:
+\itemize{
+  \item University of Pittsburgh and contributors (3Dmol.js library, bundled in inst/viewer; see inst/COPYRIGHTS) [copyright holder]
 }
 
 }
