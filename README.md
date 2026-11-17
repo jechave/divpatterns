@@ -20,14 +20,19 @@ pak::pak("jechave/divpatterns")
 
 ## Viewing a family
 
-You need a sequence alignment (FASTA) and one structure file (PDB format, one
-chain) per aligned sequence. Each sequence, without its gaps, must be the
+You need a sequence alignment (FASTA), one structure file (PDB format, one
+chain) per aligned sequence, and a table that gives the file of each sequence,
+by its id in the alignment. Each sequence, without its gaps, must be the
 sequence of the residues in its file.
 
 ``` r
 library(divpatterns)
 
-family <- read_family("family.fasta", c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb"))
+files <- data.frame(
+  id = c("1abc_A", "2def_B", "3ghi_A"),
+  file = c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb")
+)
+family <- read_family("family.fasta", files)
 fit <- fit_to_reference(family, reference = "1abc_A")
 view_family(fit, title = "My family")
 ```

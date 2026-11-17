@@ -77,7 +77,7 @@ toy_family <- function(dir) {
     ">h1", paste0(substr(seq, 1, 10), "---", substr(seq, 14, 20), "--", substr(seq, 21, 30)),
     ">h2", paste0(substr(seq, 1, 20), "GG", substr(seq, 21, 30))
   ), aln)
-  list(alignment = aln, files = files)
+  list(alignment = aln, files = data.frame(id = c("ref", "h1", "h2"), file = files))
 }
 
 # A JSON array with nulls as a numeric vector with NA.

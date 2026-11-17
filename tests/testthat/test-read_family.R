@@ -2,7 +2,7 @@ test_that("residues are placed in their alignment columns", {
   toy <- toy_family(withr::local_tempdir())
   family <- read_family(toy$alignment, toy$files)
   expect_equal(family$id, c("ref", "h1", "h2"))
-  expect_equal(family$file, toy$files)
+  expect_equal(family$file, toy$files$file)
   expect_equal(which(is.na(family$resno[1, ])), 21:22)
   expect_equal(which(is.na(family$resno[2, ])), c(11:13, 21:22))
   expect_equal(family$resno[3, ], 1:32)
@@ -11,6 +11,11 @@ test_that("residues are placed in their alignment columns", {
   expect_equal(paste(family$alignment[2, ], collapse = ""), "MKTAYIAKQR---FVKSHFS--RQLEERLGLI")
   expect_equal(family$ca[1, , c(1:20, 23:32)], helix(30), tolerance = 1e-3)
   expect_equal(is.na(family$ca[2, 1, ]), is.na(family$resno[2, ]))
+})
+
+test_that("the rows of `files` can be in any order", {
+  toy <- toy_family(withr::local_tempdir())
+  expect_identical(read_family(toy$alignment, toy$files[c(3, 1, 2), ]), read_family(toy$alignment, toy$files))
 })
 
 test_that("backbone atoms are read where files have them", {
@@ -32,7 +37,7 @@ test_that("residues with insertion codes are told apart", {
   write_pdb(files[2], helix(20) + 1, seq)
   aln <- file.path(dir, "a.fasta")
   writeLines(c(">a", seq, ">b", seq), aln)
-  family <- read_family(aln, files)
+  family <- read_family(aln, data.frame(id = c("a", "b"), file = files))
   expect_equal(family$resno[1, 10:12], c(10L, 10L, 10L))
   expect_equal(family$insert[1, 10:12], c(NA, "A", "B"))
   expect_equal(family$ca[1, , ], helix(20), tolerance = 1e-3)
@@ -54,9 +59,20 @@ test_that("a family read from files fits as expected", {
 test_that("files that do not match the alignment are errors", {
   dir <- withr::local_tempdir()
   toy <- toy_family(dir)
-  expect_snapshot(read_family(toy$alignment, toy$files[1:2]), error = TRUE, transform = \(x) gsub(dir, "DIR", x, fixed = TRUE))
-  expect_snapshot(read_family(toy$alignment, c(toy$files[1:2], "no/such/file.pdb")), error = TRUE)
-  expect_snapshot(read_family(toy$alignment, toy$files[c(1, 3, 2)]), error = TRUE, transform = \(x) gsub(dir, "DIR", x, fixed = TRUE))
+  files <- toy$files
+  expect_snapshot(read_family(toy$alignment, files$file), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, files[1:2, ]), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, rbind(files, files[2, ])), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, rbind(files, data.frame(id = "x", file = files$file[1]))), error = TRUE)
+  missing <- files
+  missing$file[3] <- "no/such/file.pdb"
+  expect_snapshot(read_family(toy$alignment, missing), error = TRUE)
+  swapped <- files
+  swapped$file <- files$file[c(1, 3, 2)]
+  expect_snapshot(read_family(toy$alignment, swapped), error = TRUE, transform = \(x) gsub(dir, "DIR", x, fixed = TRUE))
+  twice <- file.path(dir, "twice.fasta")
+  writeLines(c(readLines(toy$alignment), ">h1", "MKTAYIAKQR---FVKSHFS--RQLEERLGLI"), twice)
+  expect_snapshot(read_family(twice, files), error = TRUE)
 })
 
 test_that("a file with two chains is an error", {
@@ -66,5 +82,5 @@ test_that("a file with two chains is an error", {
   write_pdb(file, helix(20), seq, chain = rep(c("A", "B"), each = 10))
   aln <- file.path(dir, "a.fasta")
   writeLines(c(">a", seq), aln)
-  expect_snapshot(read_family(aln, file), error = TRUE, transform = \(x) gsub(dir, "DIR", x, fixed = TRUE))
+  expect_snapshot(read_family(aln, data.frame(id = "a", file = file)), error = TRUE, transform = \(x) gsub(dir, "DIR", x, fixed = TRUE))
 })

@@ -9,15 +9,17 @@ read_family(alignment, files)
 \arguments{
 \item{alignment}{Path to a FASTA alignment.}
 
-\item{files}{Paths to the structure files, in PDB format: one per sequence,
-in the order of the alignment. Each file must hold one chain.}
+\item{files}{A data frame with columns \code{id} and \code{file}: one row per
+sequence of the alignment, with its identifier, as in the alignment, and
+the path to its structure file, in PDB format. Each file must hold one
+chain. The rows can be in any order; other columns are ignored.}
 }
 \value{
 A list of class \code{divpatterns_family}. Its matrices have one row
 per structure and one column per alignment column:
 \itemize{
 \item \code{id}: the sequence identifiers of the alignment.
-\item \code{file}: the structure files.
+\item \code{file}: the structure files, in the order of the alignment.
 \item \code{alignment}: the aligned sequences, one letter per residue, \code{"-"} at
 gaps.
 \item \code{resno}, \code{insert}, \code{resname}: residue number, insertion code and
@@ -30,7 +32,8 @@ gaps and where a file lacks the atom.
 }
 \description{
 Reads a sequence alignment and one structure file per aligned sequence, and
-places every residue of every structure in its alignment column.
+places every residue of every structure in its alignment column. A table
+says which file holds the structure of each sequence.
 }
 \details{
 Each sequence of the alignment, without its gaps, must be the sequence of
@@ -43,7 +46,11 @@ used.
 }
 \examples{
 \dontrun{
-family <- read_family("family.fasta", c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb"))
+files <- data.frame(
+  id = c("1abc_A", "2def_B", "3ghi_A"),
+  file = c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb")
+)
+family <- read_family("family.fasta", files)
 }
 }
 \seealso{

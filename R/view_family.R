@@ -30,6 +30,7 @@
 #' @export
 #' @examples
 #' \dontrun{
+#' files <- data.frame(id = c("1abc_A", "2def_B"), file = c("1abc_A.pdb", "2def_B.pdb"))
 #' family <- read_family("family.fasta", files)
 #' fit <- fit_to_reference(family, reference = "1abc_A")
 #' view_family(fit, title = "My family")

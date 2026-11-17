@@ -1,7 +1,8 @@
 #' Read a family of homologous structures
 #'
 #' Reads a sequence alignment and one structure file per aligned sequence, and
-#' places every residue of every structure in its alignment column.
+#' places every residue of every structure in its alignment column. A table
+#' says which file holds the structure of each sequence.
 #'
 #' Each sequence of the alignment, without its gaps, must be the sequence of
 #' the residues in its file, in the order of the file. The first residue of
@@ -12,13 +13,15 @@
 #' used.
 #'
 #' @param alignment Path to a FASTA alignment.
-#' @param files Paths to the structure files, in PDB format: one per sequence,
-#'   in the order of the alignment. Each file must hold one chain.
+#' @param files A data frame with columns `id` and `file`: one row per
+#'   sequence of the alignment, with its identifier, as in the alignment, and
+#'   the path to its structure file, in PDB format. Each file must hold one
+#'   chain. The rows can be in any order; other columns are ignored.
 #'
 #' @return A list of class `divpatterns_family`. Its matrices have one row
 #'   per structure and one column per alignment column:
 #'   - `id`: the sequence identifiers of the alignment.
-#'   - `file`: the structure files.
+#'   - `file`: the structure files, in the order of the alignment.
 #'   - `alignment`: the aligned sequences, one letter per residue, `"-"` at
 #'     gaps.
 #'   - `resno`, `insert`, `resname`: residue number, insertion code and
@@ -32,18 +35,41 @@
 #' @export
 #' @examples
 #' \dontrun{
-#' family <- read_family("family.fasta", c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb"))
+#' files <- data.frame(
+#'   id = c("1abc_A", "2def_B", "3ghi_A"),
+#'   file = c("1abc_A.pdb", "2def_B.pdb", "3ghi_A.pdb")
+#' )
+#' family <- read_family("family.fasta", files)
 #' }
 read_family <- function(alignment, files) {
-  aln <- bio3d::read.fasta(alignment)
+  aln <- bio3d::read.fasta(alignment, rm.dup = FALSE) # bio3d would drop a repeated name; it is an error below
   ids <- aln$id
   letters <- toupper(unname(aln$ali))
   n_structures <- length(ids)
   n_columns <- ncol(letters)
 
-  if (!is.character(files) || length(files) != n_structures) {
-    stop(sprintf("The alignment has %d sequences, so `files` must be %d file paths.", n_structures, n_structures), call. = FALSE)
+  repeated <- unique(ids[duplicated(ids)])
+  if (length(repeated) > 0) {
+    stop("The alignment has more than one sequence named: ", paste(repeated, collapse = ", "), call. = FALSE)
   }
+  if (!is.data.frame(files) || !all(c("id", "file") %in% names(files))) {
+    stop("`files` must be a data frame with columns `id` and `file`.", call. = FALSE)
+  }
+  table_ids <- as.character(files$id)
+  repeated <- unique(table_ids[duplicated(table_ids)])
+  if (length(repeated) > 0) {
+    stop("`files` has more than one row for: ", paste(repeated, collapse = ", "), call. = FALSE)
+  }
+  without_file <- setdiff(ids, table_ids)
+  if (length(without_file) > 0) {
+    stop("`files` has no row for these sequences of the alignment: ", paste(without_file, collapse = ", "), call. = FALSE)
+  }
+  not_aligned <- setdiff(table_ids, ids)
+  if (length(not_aligned) > 0) {
+    stop("`files` has rows for ids that are not in the alignment: ", paste(not_aligned, collapse = ", "), call. = FALSE)
+  }
+  # the file of each sequence, in the order of the alignment
+  files <- as.character(files$file)[match(ids, table_ids)]
   missing <- files[!file.exists(files)]
   if (length(missing) > 0) {
     stop("Files not found: ", paste(missing, collapse = ", "), call. = FALSE)
