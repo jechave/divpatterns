@@ -17,7 +17,7 @@
   --noref: #8f8d86;
   --refrow: #efe6cc;
   --stage: #d3d1ca;
-  --refchain: #39ff14;
+  --refchain: #ffffff;
   --refink: #0b0b0a;
   --mark: #c51b8a;
   --hoverrow: rgba(197, 27, 138, 0.10);
@@ -27,13 +27,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #1c1c1a; --surface: #252523; --ink: #e6e5df; --soft: #a3a29a; --line: #3a3935;
-    --gap: #45443f; --noref: #85837b; --refrow: #5a5340; --stage: #33322e; --refchain: #39ff14; --mark: #f05fb6;
+    --gap: #45443f; --noref: #85837b; --refrow: #5a5340; --stage: #33322e; --refchain: #ffffff; --mark: #f05fb6;
     --hoverrow: rgba(240, 95, 182, 0.16); color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #1c1c1a; --surface: #252523; --ink: #e6e5df; --soft: #a3a29a; --line: #3a3935;
-  --gap: #45443f; --noref: #85837b; --refrow: #5a5340; --stage: #33322e; --refchain: #39ff14; --mark: #f05fb6;
+  --gap: #45443f; --noref: #85837b; --refrow: #5a5340; --stage: #33322e; --refchain: #ffffff; --mark: #f05fb6;
   --hoverrow: rgba(240, 95, 182, 0.16); color-scheme: dark;
 }
 html, body { background: var(--bg); color: var(--ink); }
@@ -263,54 +263,9 @@ __3DMOL__
     }
   }
 
-  // The lrmsd colour scale: red (#b2182b) at -CAP, white at 0, blue (#2166ac) at +CAP, interpolated in CIELAB
-  // as ggplot2's scale_fill_gradient2 does. SCALE holds 256 colours from -CAP to +CAP.
-  function hexToRgb(hex) {
-    const n = parseInt(hex.slice(1), 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  }
-  function srgbToLinear(c) {
-    c = c / 255;
-    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  }
-  function linearToSrgb(c) {
-    const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-    return Math.round(Math.min(1, Math.max(0, v)) * 255);
-  }
-  const WHITE_POINT = [0.95047, 1, 1.08883];
-  function rgbToLab(rgb) {
-    const [r, g, b] = rgb.map(srgbToLinear);
-    const xyz = [
-      0.4124564 * r + 0.3575761 * g + 0.1804375 * b,
-      0.2126729 * r + 0.7151522 * g + 0.072175 * b,
-      0.0193339 * r + 0.119192 * g + 0.9503041 * b,
-    ];
-    const f = xyz.map((v, i) => {
-      const t = v / WHITE_POINT[i];
-      return t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116;
-    });
-    return [116 * f[1] - 16, 500 * (f[0] - f[1]), 200 * (f[1] - f[2])];
-  }
-  function labToRgb([L, a, b]) {
-    const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
-    const inverse = (t) => (t * t * t > 216 / 24389 ? t * t * t : (116 * t - 16) / (24389 / 27));
-    const X = inverse(fx) * WHITE_POINT[0], Y = inverse(fy) * WHITE_POINT[1], Z = inverse(fz) * WHITE_POINT[2];
-    return [
-      3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
-      -0.969266 * X + 1.8760108 * Y + 0.041556 * Z,
-      0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z,
-    ].map(linearToSrgb);
-  }
-  const SCALE = [];
-  {
-    const red = rgbToLab(hexToRgb("#b2182b")), white = rgbToLab(hexToRgb("#ffffff")), blue = rgbToLab(hexToRgb("#2166ac"));
-    for (let i = 0; i < 256; i++) {
-      const t = (i / 255) * 2 - 1;               // -1 to 1
-      const end = t < 0 ? red : blue;
-      const lab = white.map((w, c) => w + (end[c] - w) * Math.abs(t));
-      SCALE.push("#" + labToRgb(lab).map((v) => v.toString(16).padStart(2, "0")).join(""));
-    }
-  }
+  // The colour scale: viridis, from dark purple (low) to yellow (high). SCALE holds 256 colours from -CAP to
+  // +CAP, written by view_family().
+  const SCALE = DATA.colours;
   function scaleColour(value) {
     const t = Math.max(-1, Math.min(1, value / CAP));
     return SCALE[Math.round((t + 1) / 2 * 255)];
@@ -505,6 +460,11 @@ __3DMOL__
       if (shown) { // a bar at the left of the rows shown in 3D
         labelsCtx.fillStyle = k === REF ? theme.refchain : theme.ink;
         labelsCtx.fillRect(0, y + 1, 4, grid.rowHeight - 2);
+        if (k === REF) { // the reference's colour is white: outline it so that it shows on a white panel
+          labelsCtx.strokeStyle = theme.soft;
+          labelsCtx.lineWidth = 1;
+          labelsCtx.strokeRect(0.5, y + 1.5, 3, grid.rowHeight - 3);
+        }
       }
       if (grid.rowHeight >= 7) {
         labelsCtx.font = (shown || pointed ? "600 " : "400 ") + grid.fontSize + "px " + theme.mono;
@@ -769,6 +729,14 @@ __3DMOL__
   let msaWidth = -1;        // panel width at the last build
 
   // white letters on dark backgrounds, near-black ones on light backgrounds
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function srgbToLinear(c) {
+    c = c / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
   function textColourOn(hex) {
     const [r, g, b] = hexToRgb(hex).map(srgbToLinear);
     return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.3 ? "#ffffff" : "#1c1c1a";

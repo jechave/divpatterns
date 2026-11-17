@@ -19,7 +19,8 @@ Imports:
     bio3d,
     jsonlite,
     stats,
-    utils
+    utils,
+    viridisLite
 Suggests: 
     testthat (>= 3.0.0),
     withr

@@ -7,6 +7,7 @@ test_that("the page holds the structures, their distances and the row order", {
   d <- read_page_data(file)
   expect_equal(d$n_columns, 32)
   expect_equal(d$reference, 0)
+  expect_equal(unlist(d$colours)[c(1, 128, 256)], c("#440154", "#21908D", "#FDE725"))
   expect_setequal(unlist(d$order), 1:2)
   expect_equal(vapply(d$structures, \(s) s$id, ""), c("ref", "h1", "h2"))
 

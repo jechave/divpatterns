@@ -27,12 +27,13 @@ homolog.
 }
 \details{
 The matrix is coloured by lrmsd, the log of the distance to the reference
-(red below 1 Angstrom, blue above, saturated at 0.25 and 4 Angstrom), or by nlrmsd,
-lrmsd minus the homolog's mean lrmsd over the reference sites. Its columns
-are the whole alignment, or the reference sites: the columns where the
-reference has a residue, numbered as the reference's residues. Rows are
-ordered by average-linkage clustering on the root-mean-square difference of
-their lrmsd over the reference sites (saturated as the colours are;
+(saturated at 0.25 and 4 Angstrom), or by nlrmsd, lrmsd minus the homolog's
+mean lrmsd over the reference sites (saturated at a quarter and 4 times the
+mean). Both use the viridis scale, from dark purple (low) to yellow (high).
+Its columns are the whole alignment, or the reference sites: the columns
+where the reference has a residue, numbered as the reference's residues. Rows
+are ordered by average-linkage clustering on the root-mean-square difference
+of their lrmsd over the reference sites (saturated as the colours are;
 distances below 0.001 Angstrom count as 0.001). Cartoons need N, C and O
 atoms; chains without them are drawn as Calpha traces.
 
