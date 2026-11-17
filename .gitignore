@@ -5,3 +5,5 @@
 *.Rcheck/
 *.tar.gz
 data-raw/
+dev/data/
+dev/pages/
