@@ -1,8 +1,8 @@
 # Build the viewer page of every family of every set in dev/data (built by dev/prepare/02_prepare.R):
 # dev/pages/<set>/<family>.html, one self-contained HTML file each, with the reference as the first sequence
 # of the alignment. Each structure is in <id>.pdb in the family's folder. The AlphaFold models also have
-# properties.csv (pLDDT, written by dev/prepare/03_plddt.R), so their pages can be coloured by pLDDT; the
-# crystals have none.
+# properties.csv (pLDDT, written by dev/prepare/03_plddt.R), so their pages can mask residues of low
+# pLDDT; the crystals have none.
 #
 #   Rscript dev/build_pages.R        (from the package folder)
 
