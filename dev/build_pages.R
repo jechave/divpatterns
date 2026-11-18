@@ -1,6 +1,8 @@
 # Build the viewer page of every family of every set in dev/data (built by dev/prepare/02_prepare.R):
 # dev/pages/<set>/<family>.html, one self-contained HTML file each, with the reference as the first sequence
-# of the alignment. Each structure is in <id>.pdb in the family's folder.
+# of the alignment. Each structure is in <id>.pdb in the family's folder. The AlphaFold models also have
+# properties.csv (pLDDT, written by dev/prepare/03_plddt.R), so their pages can be coloured by pLDDT; the
+# crystals have none.
 #
 #   Rscript dev/build_pages.R        (from the package folder)
 
@@ -21,7 +23,9 @@ build_page <- function(set, family) {
   alignment <- file.path(folder, "alignment.fasta")
   ids <- bio3d::read.fasta(alignment)$id
   files <- data.frame(id = ids, file = file.path(folder, paste0(ids, ".pdb")))
-  fit <- fit_to_reference(read_family(alignment, files))
+  properties <- NULL
+  if (set != "crystals") properties <- utils::read.csv(file.path(folder, "properties.csv"), colClasses = c(insert = "character"))
+  fit <- fit_to_reference(read_family(alignment, files, properties))
   view_family(fit, file = file.path("dev/pages", set, paste0(family, ".html")),
               title = paste0("Family ", family, ", ", set_names[[set]]), open = FALSE)
 }
