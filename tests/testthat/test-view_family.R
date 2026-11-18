@@ -30,6 +30,22 @@ test_that("the page holds the structures, their distances and the row order", {
   expect_null(h1$ca[[12]])
 })
 
+test_that("the page holds the residue properties", {
+  dir <- withr::local_tempdir()
+  toy <- toy_family(dir)
+  properties <- data.frame(id = c("ref", "h2", "h2"), resno = c(1, 1, 32), insert = NA, plddt = c(95, 30, 60), other = c(-1, 2, 5))
+  fit <- fit_to_reference(read_family(toy$alignment, toy$files, properties))
+  d <- read_page_data(view_family(fit, file = file.path(dir, "page.html"), open = FALSE))
+  expect_equal(unlist(d$properties), c("plddt", "other"))
+  expect_equal(num(d$structures[[3]]$properties$plddt)[c(1, 2, 32)], c(30, NA, 60))
+  expect_equal(num(d$structures[[1]]$properties$other)[1], -1)
+  expect_null(d$structures[[2]]$properties$plddt[[1]])
+
+  fit <- fit_to_reference(read_family(toy$alignment, toy$files))
+  d <- read_page_data(view_family(fit, file = file.path(dir, "page.html"), open = FALSE))
+  expect_length(d$properties, 0)
+})
+
 test_that("rows are ordered by clustering, the lower mean lrmsd first", {
   # rows 1 and 2 merge first (closest), rows 3 and 4 next; the pair with the lower mean goes first
   lrmsd <- rbind(rep(1, 20), rep(1.05, 20), rep(-1, 20), rep(-0.5, 20))

@@ -20,6 +20,7 @@
   --refchain: #ffffff;
   --refink: #0b0b0a;
   --mark: #c51b8a;
+  --masked: #d94801;
   --hoverrow: rgba(197, 27, 138, 0.10);
   --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -50,6 +51,7 @@ h1 { font-size: 22px; font-weight: 600; margin: 0; text-wrap: balance; letter-sp
 .sub { color: var(--soft); margin: 0; max-width: 95ch; }
 .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
 .group { display: flex; align-items: center; gap: 8px; }
+.group[hidden] { display: none; }
 .group-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--soft); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
 .seg button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--sans); padding: 5px 11px; cursor: pointer; }
@@ -68,9 +70,10 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 .matrix-box { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); }
 .scroller { overflow-x: auto; overflow-y: hidden; }
 .cells-wrap { position: relative; }
-#labels, #cells { display: block; }
+#labels, #cells, #profile-axis, #profile { display: block; }
 #labels, #overlay { cursor: pointer; touch-action: manipulation; }
-#overlay { position: absolute; left: 0; top: 0; }
+#overlay, #profile-overlay { position: absolute; left: 0; top: 0; }
+#profile-overlay { cursor: crosshair; }
 .viewer-col { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); }
 #stage { position: relative; width: 100%; aspect-ratio: 1 / 1; max-width: 100%; border-radius: 6px; overflow: hidden; background: var(--stage); }
 .legend { display: grid; gap: 4px; font-size: 11.5px; color: var(--soft); }
@@ -82,6 +85,7 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 .swatches i { width: 12px; height: 10px; border-radius: 2px; display: inline-block; border: 1px solid var(--line); }
 .key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--soft); }
 .key span { display: inline-flex; align-items: center; gap: 5px; }
+.key span[hidden] { display: none; }
 .key i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 .key i.refsw { height: 6px; box-shadow: 0 0 0 1px var(--soft); }
 .tag { font: 600 10px var(--sans); background: var(--ink); color: var(--bg); padding: 0 3px; border-radius: 2px; }
@@ -117,9 +121,12 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
 
   <div class="controls">
     <div class="group"><span class="group-label">Colour by</span>
-      <div class="seg" role="group" aria-label="Colour by">
+      <div class="seg" role="group" aria-label="Colour by" id="colour-buttons">
         <button id="colour-lrmsd" aria-pressed="true">lrmsd</button><button id="colour-nlrmsd" aria-pressed="false">nlrmsd</button>
       </div>
+    </div>
+    <div class="group" id="mask-group" hidden><span class="group-label">Mask pLDDT below</span>
+      <div class="seg" role="group" aria-label="Mask pLDDT below" id="mask-buttons"></div>
     </div>
     <div class="group"><span class="group-label">Columns</span>
       <div class="seg" role="group" aria-label="Columns">
@@ -144,11 +151,15 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
       <section class="panel">
         <h2>Alignment <span id="matrix-note"></span></h2>
         <div class="matrix-box" id="matrix-box">
-          <canvas id="labels"></canvas>
-          <div class="scroller" id="scroller"><div class="cells-wrap"><canvas id="cells"></canvas><canvas id="overlay"></canvas></div></div>
+          <div><canvas id="labels"></canvas><canvas id="profile-axis"></canvas></div>
+          <div class="scroller" id="scroller">
+            <div class="cells-wrap"><canvas id="cells"></canvas><canvas id="overlay"></canvas></div>
+            <div class="cells-wrap"><canvas id="profile"></canvas><canvas id="profile-overlay"></canvas></div>
+          </div>
           <div class="tip" id="tip" hidden></div>
         </div>
         <div class="legend" id="legend"></div>
+        <div class="legend" id="profile-note"></div>
       </section>
       <section class="panel">
         <h2>Chains shown in 3D <span id="msa-note"></span></h2>
@@ -162,6 +173,7 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13
         <span><i class="refsw" style="background: var(--refchain)"></i>reference</span>
         <span><i style="background: var(--mark); height: 8px; width: 8px; border-radius: 50%"></i>marked column</span>
         <span><i style="background: var(--noref)"></i>no reference residue</span>
+        <span id="key-masked" hidden><i style="background: var(--masked)"></i><span id="key-masked-text"></span></span>
         <span><b class="tag">N</b><b class="tag">C</b>ends</span>
       </div>
       <div class="readout" id="readout"></div>
@@ -191,6 +203,9 @@ __3DMOL__
   const N_COLUMNS = DATA.n_columns;
   const CAP = DATA.cap;                 // colours saturate at lrmsd -CAP and +CAP
   const ROWS = [REF].concat(DATA.order); // rows of the matrix: the reference, then the homologs (clustered order)
+  const PROPERTY_NAMES = DATA.properties; // names of the residue properties; each structure has its values by column
+  const HAS_PLDDT = PROPERTY_NAMES.includes("plddt");
+  const CUTOFFS = [50, 70, 80, 90];       // the pLDDT cutoffs of the mask
 
   function hasResidue(k, a) {
     return STRUCTURES[k].resno[a] !== null;
@@ -229,6 +244,7 @@ __3DMOL__
   // =====================================================================================================
   const state = {
     colourBy: "lrmsd",                 // "lrmsd" or "nlrmsd"
+    cutoff: null,                      // the pLDDT mask: one of CUTOFFS, or null (no mask)
     columns: "alignment",              // "alignment" (every column) or "sites" (the reference sites)
     shown: new Set([REF, DATA.order[0], DATA.order[DATA.order.length - 1]]), // structures drawn in 3D
     cartoon: false,                    // false: Calpha traces
@@ -258,7 +274,7 @@ __3DMOL__
   // the colours of the current theme (light or dark), read from the style sheet at every redraw
   const theme = {};
   function readTheme() {
-    for (const name of ["gap", "noref", "refrow", "refchain", "refink", "mark", "ink", "soft", "bg", "stage", "hoverrow", "mono", "sans"]) {
+    for (const name of ["gap", "noref", "refrow", "refchain", "refink", "mark", "masked", "ink", "soft", "line", "bg", "stage", "hoverrow", "mono", "sans"]) {
       theme[name] = cssVar("--" + name);
     }
   }
@@ -281,17 +297,42 @@ __3DMOL__
     return state.colourBy === "nlrmsd" ? lrmsd - s.mean_lrmsd : lrmsd;
   }
 
+  // The pLDDT of structure k at column a; null where there is none.
+  function plddtAt(k, a) {
+    return HAS_PLDDT ? STRUCTURES[k].properties.plddt[a] : null;
+  }
+  // Whether the mask hides structure k at column a: a homolog's residue when it or the reference residue has a
+  // pLDDT below the cutoff (only where the homolog has a distance), a reference residue when its own pLDDT is.
+  // A residue without a pLDDT is not masked by itself.
+  function isMasked(k, a) {
+    if (state.cutoff === null || !hasResidue(k, a)) return false;
+    const low = (value) => value !== null && value < state.cutoff;
+    if (k === REF) return low(plddtAt(REF, a));
+    if (STRUCTURES[k].distance[a] === null) return false;
+    return low(plddtAt(k, a)) || low(plddtAt(REF, a));
+  }
+
   // Colour of a residue in the matrix and in the alignment panel.
   function cellColour(k, a) {
     if (!hasResidue(k, a)) return theme.gap;
+    if (isMasked(k, a)) return theme.masked;
     if (k === REF) return theme.refrow;
     const value = valueAt(k, a);
     if (value === null) return theme.noref;
     return scaleColour(value);
   }
-  // Colour of a residue in 3D: the reference in its own colour.
+  // Colour of a residue in 3D: as in the matrix, the reference in its own colour.
   function colourIn3D(k, a) {
-    return k === REF ? theme.refchain : cellColour(k, a);
+    return k === REF && !isMasked(k, a) ? theme.refchain : cellColour(k, a);
+  }
+  // Text for the properties of a residue: "plddt 87.3", one entry per property it has a value of.
+  function propertiesText(k, a) {
+    const texts = [];
+    for (const name of PROPERTY_NAMES) {
+      const value = STRUCTURES[k].properties[name][a];
+      if (value !== null) texts.push(name + " " + Number(value.toFixed(2)));
+    }
+    return texts.join(" · ");
   }
 
   // =====================================================================================================
@@ -304,6 +345,15 @@ __3DMOL__
 
   byId("colour-lrmsd").addEventListener("click", () => { state.colourBy = "lrmsd"; redraw(); });
   byId("colour-nlrmsd").addEventListener("click", () => { state.colourBy = "nlrmsd"; redraw(); });
+  // the mask's buttons: none, then one per cutoff; only if the structures have a pLDDT
+  byId("mask-group").hidden = !HAS_PLDDT;
+  for (const cutoff of [null].concat(CUTOFFS)) {
+    const button = document.createElement("button");
+    button.id = "mask-" + (cutoff === null ? "none" : cutoff);
+    button.textContent = cutoff === null ? "none" : String(cutoff);
+    button.addEventListener("click", () => { state.cutoff = cutoff; redraw(); });
+    byId("mask-buttons").appendChild(button);
+  }
   byId("columns-alignment").addEventListener("click", () => { state.columns = "alignment"; scrollToReference = true; removeMark(); redraw(); });
   byId("columns-sites").addEventListener("click", () => { state.columns = "sites"; scrollToReference = true; removeMark(); redraw(); });
   byId("trace").addEventListener("click", () => { state.cartoon = false; redraw(); });
@@ -316,6 +366,9 @@ __3DMOL__
   function updateControls() {
     byId("colour-lrmsd").setAttribute("aria-pressed", String(state.colourBy === "lrmsd"));
     byId("colour-nlrmsd").setAttribute("aria-pressed", String(state.colourBy === "nlrmsd"));
+    for (const cutoff of [null].concat(CUTOFFS)) {
+      byId("mask-" + (cutoff === null ? "none" : cutoff)).setAttribute("aria-pressed", String(state.cutoff === cutoff));
+    }
     byId("columns-alignment").setAttribute("aria-pressed", String(state.columns === "alignment"));
     byId("columns-sites").setAttribute("aria-pressed", String(state.columns === "sites"));
     byId("trace").setAttribute("aria-pressed", String(!state.cartoon));
@@ -324,7 +377,9 @@ __3DMOL__
     byId("show-reference").checked = state.shown.has(REF);
     const columns = state.columns === "alignment" ? N_COLUMNS + " alignment columns" : SITE_COLUMNS.length + " reference sites";
     byId("summary").textContent = DATA.order.length + " homologs · reference " + STRUCTURES[REF].id + " · " + columns;
-    byId("matrix-note").textContent = state.colourBy;
+    byId("matrix-note").textContent = state.colourBy + (state.cutoff === null ? "" : " · masked below pLDDT " + state.cutoff);
+    byId("key-masked").hidden = state.cutoff === null;
+    byId("key-masked-text").textContent = "pLDDT below " + state.cutoff;
     drawLegend();
   }
 
@@ -345,7 +400,8 @@ __3DMOL__
     byId("legend").innerHTML =
       '<div class="ramp" style="background:linear-gradient(90deg,' + stops.join(",") + ')"></div>' +
       '<div class="ticks">' + ticks + "</div>" +
-      '<div class="swatches">' + swatch("var(--noref)", "no reference residue") + swatch("var(--gap)", "gap") + swatch("var(--refrow)", "reference row") + "</div>";
+      '<div class="swatches">' + swatch("var(--noref)", "no reference residue") + swatch("var(--gap)", "gap") + swatch("var(--refrow)", "reference row") +
+      (state.cutoff === null ? "" : swatch("var(--masked)", "masked: pLDDT below " + state.cutoff)) + "</div>";
   }
 
   // =====================================================================================================
@@ -592,6 +648,10 @@ __3DMOL__
       setMark(a, k);
     }
     tip.hidden = false;
+    placeTip(event);
+  }
+  // The tooltip next to the pointer, inside the matrix panel.
+  function placeTip(event) {
     const box = matrixBox.getBoundingClientRect();
     tip.style.left = Math.max(0, Math.min(event.clientX - box.left + 12, matrixBox.clientWidth - tip.offsetWidth)) + "px";
     tip.style.top = (event.clientY - box.top + 16) + "px";
@@ -600,13 +660,181 @@ __3DMOL__
   function residueAndDistanceText(k, a) {
     if (!hasResidue(k, a)) return "gap";
     let text = residueText(k, a);
-    if (k === REF) return text;
     const distance = STRUCTURES[k].distance[a];
-    if (distance === null) return text + " · no reference residue";
-    text += " · " + distance.toFixed(2) + " Å";
-    if (state.colourBy === "nlrmsd") text += " · nlrmsd " + valueAt(k, a).toFixed(2);
+    if (k !== REF && distance === null) text += " · no reference residue";
+    if (k !== REF && distance !== null) text += " · " + distance.toFixed(2) + " Å";
+    if (k !== REF && distance !== null && state.colourBy === "nlrmsd") text += " · nlrmsd " + valueAt(k, a).toFixed(2);
+    const properties = propertiesText(k, a);
+    if (properties !== "") text += " · " + properties;
+    if (isMasked(k, a)) text += " · masked";
     return text;
   }
+
+  // =====================================================================================================
+  // The profile, under the matrix and in its columns: the lrmsd (or nlrmsd) of each homolog shown in 3D, masked
+  // residues left out, and their average at each column: the log of the root-mean-square of exp(value) (for
+  // lrmsd, of the distance) over the homologs shown that have a value there, drawn where there are at least
+  // MIN_HOMOLOGS. Under it, bars: how many homologs have a value at each column. The average is for display;
+  // it is not a definition of a family profile.
+  // =====================================================================================================
+  const PLOT_TOP = 8, PLOT_HEIGHT = 150;
+  const COUNT_TOP = PLOT_TOP + PLOT_HEIGHT + 8, COUNT_HEIGHT = 20;
+  const PROFILE_HEIGHT = COUNT_TOP + COUNT_HEIGHT + 4;
+  const PLOT_RANGE = Math.log(10); // the plot spans distances from 0.1 to 10 Angstrom (nlrmsd: a tenth to 10 times the mean)
+  const MIN_HOMOLOGS = 3;
+  const profileAxisCanvas = byId("profile-axis"), profileCanvas = byId("profile"), profileOverlayCanvas = byId("profile-overlay");
+  const profileAxisCtx = profileAxisCanvas.getContext("2d"), profileCtx = profileCanvas.getContext("2d");
+  const profileOverlayCtx = profileOverlayCanvas.getContext("2d");
+  let profile = null; // set by computeProfile()
+
+  // The homologs shown, their values at each matrix position j (null: none, or masked), and at each j the
+  // average and the number of homologs with a value.
+  function computeProfile() {
+    const homologs = DATA.order.filter((k) => state.shown.has(k));
+    const values = new Map();
+    for (const k of homologs) values.set(k, grid.columns.map((a) => (isMasked(k, a) ? null : valueAt(k, a))));
+    const average = [], count = [];
+    for (let j = 0; j < grid.columns.length; j++) {
+      let sum = 0, n = 0;
+      for (const k of homologs) {
+        const value = values.get(k)[j];
+        if (value === null) continue;
+        sum += Math.exp(2 * value);
+        n += 1;
+      }
+      count.push(n);
+      average.push(n >= MIN_HOMOLOGS ? 0.5 * Math.log(sum / n) : null);
+    }
+    profile = { homologs, values, average, count };
+  }
+
+  function plotY(value) { return PLOT_TOP + (1 - (value + PLOT_RANGE) / (2 * PLOT_RANGE)) * PLOT_HEIGHT; }
+  function columnX(j) { return (cellLeft(j) + cellRight(j)) / 2; }
+
+  // A line through the values at the matrix positions, broken where there is none; a short dash where a value
+  // has no neighbour. Drawn inside the plot only.
+  function drawLine(ctx, values) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, PLOT_TOP, grid.width, PLOT_HEIGHT);
+    ctx.clip();
+    ctx.beginPath();
+    for (let j = 0; j < values.length; j++) {
+      if (values[j] === null) continue;
+      const x = columnX(j), y = plotY(values[j]);
+      const before = j > 0 && values[j - 1] !== null, after = j < values.length - 1 && values[j + 1] !== null;
+      if (before) {
+        ctx.lineTo(x, y);
+      } else if (after) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.moveTo(x - 1.5, y);
+        ctx.lineTo(x + 1.5, y);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawProfile() {
+    sizeCanvas(profileAxisCanvas, profileAxisCtx, grid.labelWidth, PROFILE_HEIGHT);
+    sizeCanvas(profileCanvas, profileCtx, grid.width, PROFILE_HEIGHT);
+    sizeCanvas(profileOverlayCanvas, profileOverlayCtx, grid.width, PROFILE_HEIGHT);
+    computeProfile();
+    const ctx = profileCtx, axis = profileAxisCtx;
+    ctx.clearRect(0, 0, grid.width, PROFILE_HEIGHT);
+    axis.clearRect(0, 0, grid.labelWidth, PROFILE_HEIGHT);
+
+    // grid lines at distances (nlrmsd: ratios to the homolog's mean) 0.1, 0.25, 0.5, 1, 2, 4 and 10
+    ctx.strokeStyle = theme.line;
+    ctx.lineWidth = 1;
+    axis.fillStyle = theme.soft;
+    axis.font = "10.5px " + theme.mono;
+    axis.textAlign = "right";
+    axis.textBaseline = "middle";
+    for (const d of [0.1, 0.25, 0.5, 1, 2, 4, 10]) {
+      const y = Math.round(plotY(Math.log(d))) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(grid.width, y); ctx.stroke();
+      const text = state.colourBy === "nlrmsd" ? "×" + d : d === 10 ? "10 Å" : String(d);
+      axis.fillText(text, grid.labelWidth - 6, y);
+    }
+    axis.fillText("n", grid.labelWidth - 6, COUNT_TOP + COUNT_HEIGHT / 2);
+
+    // the homologs, then their average on top
+    ctx.strokeStyle = theme.soft;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1;
+    for (const k of profile.homologs) drawLine(ctx, profile.values.get(k));
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = theme.ink;
+    ctx.lineWidth = 2.2;
+    drawLine(ctx, profile.average);
+
+    // the number of homologs with a value, as a share of the homologs shown
+    ctx.fillStyle = theme.soft;
+    ctx.globalAlpha = 0.55;
+    for (let j = 0; j < profile.count.length; j++) {
+      if (profile.count[j] === 0) continue;
+      const height = profile.count[j] / profile.homologs.length * COUNT_HEIGHT;
+      ctx.fillRect(cellLeft(j), COUNT_TOP + COUNT_HEIGHT - height, Math.max(1, cellRight(j) - cellLeft(j)), height);
+    }
+    ctx.globalAlpha = 1;
+
+    const what = state.colourBy === "nlrmsd" ? "distance divided by the homolog's geometric mean distance" : "distance";
+    byId("profile-note").textContent = "Profile: thin lines, the " + state.colourBy + " of the " + profile.homologs.length +
+      " homologs shown in 3D" + (state.cutoff === null ? "" : ", masked residues left out") +
+      "; thick line, their average: log of the root-mean-square " + what + " over those with a value, where at least " +
+      MIN_HOMOLOGS + "; bars (n), how many have a value." +
+      (profile.homologs.length < MIN_HOMOLOGS ? " Show at least " + MIN_HOMOLOGS + " homologs to see the average." : "");
+  }
+
+  // The line of the homolog pointed at, and the marked column.
+  function drawProfileOverlay() {
+    if (!profile) return;
+    const ctx = profileOverlayCtx;
+    ctx.clearRect(0, 0, grid.width, PROFILE_HEIGHT);
+    ctx.strokeStyle = theme.mark;
+    if (profile.values.has(state.markStructure)) {
+      ctx.lineWidth = 2;
+      drawLine(ctx, profile.values.get(state.markStructure));
+    }
+    if (!grid.indexOfColumn.has(state.markColumn)) return;
+    const x = Math.round(columnX(grid.indexOfColumn.get(state.markColumn))) + 0.5;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, PLOT_TOP); ctx.lineTo(x, COUNT_TOP + COUNT_HEIGHT); ctx.stroke();
+  }
+
+  // Pointing at the profile marks the column, and the homolog whose line is nearest (within 5 pixels).
+  profileOverlayCanvas.addEventListener("pointermove", (event) => {
+    const box = profileOverlayCanvas.getBoundingClientRect();
+    const x = event.clientX - box.left, y = event.clientY - box.top;
+    const j = Math.max(0, Math.min(grid.columns.length - 1, Math.floor(x / grid.cellWidth)));
+    const a = grid.columns[j];
+    let nearest = -1, nearestDistance = 5;
+    for (const k of profile.homologs) {
+      const value = profile.values.get(k)[j];
+      if (value === null) continue;
+      const distance = Math.abs(plotY(value) - y);
+      if (distance <= nearestDistance) { nearest = k; nearestDistance = distance; }
+    }
+    state.pinned = false;
+    setMark(a, nearest);
+    if (nearest >= 0) {
+      tip.textContent = STRUCTURES[nearest].id + " · " + columnText(a) + " · " + residueAndDistanceText(nearest, a);
+    } else if (profile.average[j] === null) {
+      tip.textContent = columnText(a) + " · no average: " + profile.count[j] + " homologs with a value";
+    } else {
+      const ratio = Math.exp(profile.average[j]);
+      tip.textContent = columnText(a) + " · average " + (state.colourBy === "nlrmsd" ? "×" + ratio.toFixed(2) : ratio.toFixed(2) + " Å") +
+        " over " + profile.count[j] + " homologs";
+    }
+    tip.hidden = false;
+    placeTip(event);
+  });
+  profileOverlayCanvas.addEventListener("pointerleave", () => {
+    tip.hidden = true;
+    if (!state.pinned) removeMark();
+  });
 
   // =====================================================================================================
   // 3D
@@ -868,7 +1096,9 @@ __3DMOL__
         distance = s.distance[a] === null ? "no ref. residue" : s.distance[a].toFixed(2) + " Å";
         if (state.colourBy === "nlrmsd" && s.distance[a] !== null) nlrmsd = "nlrmsd " + valueAt(k, a).toFixed(2);
       }
-      const texts = [s.id + (k === REF ? " (ref)" : ""), present ? residueText(k, a) : "gap", distance, nlrmsd, line.shown ? "" : "not shown"];
+      const properties = present ? propertiesText(k, a) : "";
+      const notes = [isMasked(k, a) ? "masked" : "", line.shown ? "" : "not shown"].filter((x) => x !== "").join(", ");
+      const texts = [s.id + (k === REF ? " (ref)" : ""), present ? residueText(k, a) : "gap", distance, nlrmsd, properties, notes];
       const row = document.createElement("tr");
       if (k === state.markStructure) row.classList.add("pointed");
       if (!line.shown) row.classList.add("hidden");
@@ -892,6 +1122,7 @@ __3DMOL__
     state.markColumn = column;
     state.markStructure = structure;
     drawOverlay();
+    drawProfileOverlay();
     drawLabels();
     drawMarks3D();
     markAlignmentPanel();
@@ -972,6 +1203,8 @@ __3DMOL__
       drawCells();
       drawOverlay();
       drawLabels();
+      drawProfile();
+      drawProfileOverlay();
       build3D(zoomRequested);
       zoomRequested = false;
       buildAlignmentPanel();
@@ -991,6 +1224,8 @@ __3DMOL__
     drawCells();
     drawOverlay();
     drawLabels();
+    drawProfile();
+    drawProfileOverlay();
     viewer.resize();
     viewer.render();
     if (msa.clientWidth !== msaWidth) buildAlignmentPanel();
@@ -1002,7 +1237,7 @@ __3DMOL__
   // For automated checks of the page; the page itself does not use this.
   window.__view = {
     state: () => ({
-      colourBy: state.colourBy, columns: state.columns, cartoon: state.cartoon, beads: state.beads, pinned: state.pinned,
+      colourBy: state.colourBy, cutoff: state.cutoff, columns: state.columns, cartoon: state.cartoon, beads: state.beads, pinned: state.pinned,
       markColumn: state.markColumn, markStructure: state.markStructure, shown: [...state.shown],
     }),
     rows: () => ROWS.slice(),
@@ -1016,6 +1251,10 @@ __3DMOL__
       first: (() => { const x = m.model.selectedAtoms({ atom: "CA" })[0]; return [x.x, x.y, x.z]; })(),
     })),
     marks: () => markCount,
+    // the profile: the homologs in it, and at each matrix position the average and the number of homologs
+    profile: () => ({ homologs: profile.homologs.slice(), average: profile.average.slice(), count: profile.count.slice() }),
+    masked: (k, a) => isMasked(k, a),
+    colours: (k, a) => ({ matrix: cellColour(k, a), in3D: colourIn3D(k, a) }),
     // each structure shown: its letters in the alignment panel, all blocks joined
     alignmentRows: () => models.map((m) => [...msa.querySelectorAll('.c[data-structure="' + m.structure + '"]')].map((c) => c.textContent).join("")),
     readout: () => byId("readout").innerText,

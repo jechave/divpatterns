@@ -84,3 +84,48 @@ test_that("a file with two chains is an error", {
   writeLines(c(">a", seq), aln)
   expect_snapshot(read_family(aln, data.frame(id = "a", file = file)), error = TRUE, transform = \(x) gsub(dir, "DIR", x, fixed = TRUE))
 })
+
+test_that("properties are placed in the columns of their residues", {
+  toy <- toy_family(withr::local_tempdir())
+  properties <- data.frame(
+    id = c("h2", "ref", "ref", "h2"),
+    resno = c(32, 1, 30, 21),
+    insert = c("", NA, NA, ""),
+    plddt = c(41.5, 90, NA, 77),
+    other = c(1, 2, 3, 4)
+  )
+  family <- read_family(toy$alignment, toy$files, properties)
+  expect_equal(names(family$properties), c("plddt", "other"))
+  plddt <- family$properties$plddt
+  expect_equal(dim(plddt), c(3, 32))
+  expect_equal(plddt[1, 1], 90)
+  expect_equal(plddt[3, 32], 41.5)
+  expect_equal(plddt[3, 21], 77) # h2's residue 21 is in column 21, a gap of the reference
+  expect_equal(sum(!is.na(plddt)), 3)
+  expect_equal(family$properties$other[1, 32], 3) # the reference's residue 30 is in column 32
+  expect_equal(read_family(toy$alignment, toy$files)$properties, list())
+})
+
+test_that("properties match residues by insertion code", {
+  dir <- withr::local_tempdir()
+  seq <- "MKTAYIAKQLLLSFVKSHFS"
+  file <- file.path(dir, "a.pdb")
+  write_pdb(file, helix(20), seq, resno = c(1:10, 10, 10, 11:18), insert = c(rep(" ", 10), "A", "B", rep(" ", 8)))
+  aln <- file.path(dir, "a.fasta")
+  writeLines(c(">a", seq), aln)
+  properties <- data.frame(id = "a", resno = 10, insert = c("B", "", "A"), x = c(3, 1, 2))
+  family <- read_family(aln, data.frame(id = "a", file = file), properties)
+  expect_equal(family$properties$x[1, 10:12], c(1, 2, 3))
+})
+
+test_that("property tables that do not match the family are errors", {
+  toy <- toy_family(withr::local_tempdir())
+  good <- data.frame(id = "ref", resno = 1:3, insert = NA, plddt = c(90, 80, 70))
+  expect_snapshot(read_family(toy$alignment, toy$files, good[, c("id", "resno", "plddt")]), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, toy$files, good[, c("id", "resno", "insert")]), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, toy$files, transform(good, plddt = as.character(plddt))), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, toy$files, transform(good, plddt = NA_real_)), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, toy$files, transform(good, resno = c(1, 2.5, 3))), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, toy$files, rbind(good, good[2, ])), error = TRUE)
+  expect_snapshot(read_family(toy$alignment, toy$files, rbind(good, data.frame(id = c("h1", "x"), resno = c(28, 1), insert = NA, plddt = 1))), error = TRUE)
+})

@@ -17,6 +17,14 @@
 #'   sequence of the alignment, with its identifier, as in the alignment, and
 #'   the path to its structure file, in PDB format. Each file must hold one
 #'   chain. The rows can be in any order; other columns are ignored.
+#' @param properties Optional. Values of residue properties, such as pLDDT or
+#'   B-factors, shown in [view_family()] (one named `plddt` can mask residues
+#'   of low confidence): a data frame with columns
+#'   `id`, `resno` and `insert`, which identify a residue by the id of its
+#'   sequence and its residue number and insertion code in its file (`NA` or
+#'   `""` for none), and then one numeric column per property, named by the
+#'   property. Each row must be a residue of the family; residues without a
+#'   row, and `NA` values, have no value. The rows can be in any order.
 #'
 #' @return A list of class `divpatterns_family`. Its matrices have one row
 #'   per structure and one column per alignment column:
@@ -30,6 +38,9 @@
 #'   - `ca`, `n`, `c`, `o`: coordinates of the Calpha, N, C and O atoms,
 #'     arrays indexed by structure, coordinate (x, y, z) and column; `NA` at
 #'     gaps and where a file lacks the atom.
+#'   - `properties`: one matrix per property, named as its column in
+#'     `properties`; `NA` at gaps and where a residue has no value. An empty
+#'     list without `properties`.
 #'
 #' @seealso [fit_to_reference()], [view_family()]
 #' @export
@@ -41,7 +52,7 @@
 #' )
 #' family <- read_family("family.fasta", files)
 #' }
-read_family <- function(alignment, files) {
+read_family <- function(alignment, files, properties = NULL) {
   aln <- bio3d::read.fasta(alignment, rm.dup = FALSE) # bio3d would drop a repeated name; it is an error below
   ids <- aln$id
   letters <- toupper(unname(aln$ali))
@@ -105,10 +116,62 @@ read_family <- function(alignment, files) {
   structure(
     list(
       id = ids, file = files, alignment = letters, resno = resno, insert = insert, resname = resname,
-      ca = ca_xyz, n = n_xyz, c = c_xyz, o = o_xyz
+      ca = ca_xyz, n = n_xyz, c = c_xyz, o = o_xyz,
+      properties = place_properties(properties, ids, resno, insert)
     ),
     class = "divpatterns_family"
   )
+}
+
+# The properties of read_family(): each property column of the table `properties` as a matrix like `resno`
+# (structures x alignment columns), each value in the cell of its residue. An empty list for NULL.
+place_properties <- function(properties, ids, resno, insert) {
+  if (is.null(properties)) {
+    return(list())
+  }
+  if (!is.data.frame(properties) || !all(c("id", "resno", "insert") %in% names(properties))) {
+    stop("`properties` must be a data frame with columns `id`, `resno` and `insert`, and one column per property.", call. = FALSE)
+  }
+  property_names <- setdiff(names(properties), c("id", "resno", "insert"))
+  if (length(property_names) == 0) {
+    stop("`properties` has no property columns.", call. = FALSE)
+  }
+  for (name in property_names) {
+    if (!is.numeric(properties[[name]])) {
+      stop(sprintf("Property `%s` must be numeric.", name), call. = FALSE)
+    }
+    if (all(is.na(properties[[name]]))) {
+      stop(sprintf("Property `%s` has no values.", name), call. = FALSE)
+    }
+  }
+  if (!is.numeric(properties$resno) || anyNA(properties$resno) || any(properties$resno != round(properties$resno))) {
+    stop("`resno` in `properties` must be whole numbers.", call. = FALSE)
+  }
+
+  # each row's residue, and each residue of the family, as "id resno" with the insertion code after resno
+  code <- as.character(properties$insert)
+  code[is.na(code) | trimws(code) == ""] <- ""
+  row_residue <- paste0(properties$id, " ", as.integer(properties$resno), code) # "1abc_A 10", "1abc_A 10A"
+  repeated <- unique(row_residue[duplicated(row_residue)])
+  if (length(repeated) > 0) {
+    stop("`properties` has more than one row for: ", paste(utils::head(repeated, 5), collapse = ", "), call. = FALSE)
+  }
+  cells <- which(!is.na(resno), arr.ind = TRUE) # row: structure, col: alignment column
+  cell_insert <- insert[cells]
+  cell_insert[is.na(cell_insert)] <- ""
+  cell_residue <- paste0(ids[cells[, 1]], " ", resno[cells], cell_insert)
+  where <- match(row_residue, cell_residue)
+  if (anyNA(where)) {
+    stop("`properties` has rows for residues that are not in the family: ", paste(utils::head(row_residue[is.na(where)], 5), collapse = ", "), call. = FALSE)
+  }
+
+  placed <- list()
+  for (name in property_names) {
+    values <- matrix(NA_real_, nrow(resno), ncol(resno))
+    values[cells[where, , drop = FALSE]] <- properties[[name]]
+    placed[[name]] <- values
+  }
+  placed
 }
 
 #' @export

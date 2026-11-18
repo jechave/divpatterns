@@ -4,7 +4,7 @@
 \alias{read_family}
 \title{Read a family of homologous structures}
 \usage{
-read_family(alignment, files)
+read_family(alignment, files, properties = NULL)
 }
 \arguments{
 \item{alignment}{Path to a FASTA alignment.}
@@ -13,6 +13,15 @@ read_family(alignment, files)
 sequence of the alignment, with its identifier, as in the alignment, and
 the path to its structure file, in PDB format. Each file must hold one
 chain. The rows can be in any order; other columns are ignored.}
+
+\item{properties}{Optional. Values of residue properties, such as pLDDT or
+B-factors, shown in \code{\link[=view_family]{view_family()}} (one named \code{plddt} can mask residues
+of low confidence): a data frame with columns
+\code{id}, \code{resno} and \code{insert}, which identify a residue by the id of its
+sequence and its residue number and insertion code in its file (\code{NA} or
+\code{""} for none), and then one numeric column per property, named by the
+property. Each row must be a residue of the family; residues without a
+row, and \code{NA} values, have no value. The rows can be in any order.}
 }
 \value{
 A list of class \code{divpatterns_family}. Its matrices have one row
@@ -28,6 +37,9 @@ a residue has no insertion code.
 \item \code{ca}, \code{n}, \code{c}, \code{o}: coordinates of the Calpha, N, C and O atoms,
 arrays indexed by structure, coordinate (x, y, z) and column; \code{NA} at
 gaps and where a file lacks the atom.
+\item \code{properties}: one matrix per property, named as its column in
+\code{properties}; \code{NA} at gaps and where a residue has no value. An empty
+list without \code{properties}.
 }
 }
 \description{

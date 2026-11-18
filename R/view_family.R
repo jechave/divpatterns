@@ -14,8 +14,24 @@
 #' where the reference has a residue, numbered as the reference's residues. Rows
 #' are ordered by average-linkage clustering on the root-mean-square difference
 #' of their lrmsd over the reference sites (saturated as the colours are;
-#' distances below 0.001 Angstrom count as 0.001). Cartoons need N, C and O
-#' atoms; chains without them are drawn as Calpha traces.
+#' distances below 0.001 Angstrom count as 0.001).
+#'
+#' Under the matrix, a profile plot shows, at each column, the lrmsd (or
+#' nlrmsd) of each homolog shown in 3D, and their average: the log of the
+#' root-mean-square distance (for nlrmsd, of the distance divided by the
+#' homolog's geometric mean distance) over the homologs shown that have a value
+#' there, drawn where there are at least 3. The average is computed in the page
+#' for display; it is not a definition of a family profile.
+#'
+#' If the residue properties given to [read_family()] include one named
+#' `plddt`, a mask can be set at pLDDT 50, 70, 80 or 90: a homolog's cell is
+#' masked when the homolog or the reference has a pLDDT below the cutoff there,
+#' and a reference residue when its own pLDDT is below it. Masked residues are
+#' drawn in orange in the matrix and in 3D, and are left out of the profile
+#' plot. A residue without a pLDDT is not masked by itself. The mask does not
+#' change the fit. The values of every property are shown when pointing at a
+#' residue. Cartoons need N, C and O atoms; chains without them are drawn as
+#' Calpha traces.
 #'
 #' The page is one file with its data and the 3Dmol.js library inside, so it
 #' works offline and can be sent as it is.
@@ -99,7 +115,8 @@ page_data <- function(fit) {
       n = coordinates_by_column(family$n[k, , ]),
       c = coordinates_by_column(family$c[k, , ]),
       o = coordinates_by_column(family$o[k, , ]),
-      distance = round(sqrt(fit$d2[k, ]), 3)
+      distance = round(sqrt(fit$d2[k, ]), 3),
+      properties = lapply(family$properties, function(values) values[k, ])
     )
     if (k != ref) {
       both <- family$alignment[ref, ] != "-" & family$alignment[k, ] != "-"
@@ -117,6 +134,7 @@ page_data <- function(fit) {
     n_columns = jsonlite::unbox(n_columns),
     reference = jsonlite::unbox(ref - 1),
     order = order - 1,
+    properties = as.character(names(family$properties)), # the names of the residue properties
     structures = structures
   )
 }

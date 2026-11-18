@@ -52,3 +52,30 @@ in 3D; click a row to show or hide that homolog.
 The file holds its data and the 3Dmol.js library, so it works offline and can
 be sent as it is. Cartoons need N, C and O atoms; chains with Calpha only are
 drawn as traces.
+
+## Residue properties and the pLDDT mask
+
+Residue properties, such as pLDDT or B-factors, are given to `read_family()` as
+a table with one row per residue: the columns `id`, `resno` and `insert` say
+which residue (by the id of its sequence, and its residue number and insertion
+code in its file), and each further column is a property.
+
+``` r
+properties <- read.csv("properties.csv") # columns id, resno, insert, plddt
+family <- read_family("family.fasta", files, properties)
+```
+
+The page shows the values of every property when pointing at a residue. With a
+property named `plddt`, a mask can be set at pLDDT 50, 70, 80 or 90: a
+homolog's cell is masked when the homolog or the reference has a pLDDT below
+the cutoff there. Masked residues are orange in the matrix and in 3D, and are
+left out of the profile plot. The mask does not change the fit.
+
+## The profile plot
+
+Under the matrix, in the same columns, a plot shows the lrmsd (or nlrmsd) of
+each homolog shown in 3D as a thin line, and their average as a thick line: the
+log of the root-mean-square distance over the homologs shown with a value at
+the column, where there are at least 3. Bars under it count those homologs. The
+average is computed in the page for display; it is not a definition of a family
+profile.
